@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RetiraFácil</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2345b7c9'/><rect x='20' y='25' width='60' height='60' rx='15' fill='none' stroke='white' stroke-width='5'/><circle cx='38' cy='52' r='5' fill='white'/><circle cx='62' cy='52' r='5' fill='white'/><path d='M 38 65 Q 50 75 62 65' fill='none' stroke='white' stroke-width='5' stroke-linecap='round'/><circle cx='50' cy='25' r='14' fill='white'/><path d='M 50 17 C 45 12, 38 18, 50 29 C 62 18, 55 12, 50 17 Z' fill='%23e53935'/></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .no-scrollbar { -ms-overflow-style: none;  scrollbar-width: none; }
+
+    /* Modo escuro */
+    body.dark-mode {
+      background-color: #0f172a !important;
+      color: #e2e8f0 !important;
+      color-scheme: dark;
+    }
+    body.dark-mode .bg-white { background-color: #1e293b !important; }
+    body.dark-mode .bg-slate-50,
+    body.dark-mode .bg-slate-100,
+    body.dark-mode .bg-slate-100\/70,
+    body.dark-mode .bg-slate-100\/90,
+    body.dark-mode .bg-slate-50\/50 { background-color: #273449 !important; }
+    body.dark-mode .hover\:bg-slate-50\/80:hover,
+    body.dark-mode .hover\:bg-slate-100:hover,
+    body.dark-mode .hover\:bg-slate-200:hover { background-color: #334155 !important; }
+    body.dark-mode .border-slate-100,
+    body.dark-mode .border-slate-200,
+    body.dark-mode .border-slate-300 { border-color: #475569 !important; }
+    body.dark-mode .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+      border-color: #334155 !important;
+    }
+    body.dark-mode .text-slate-900,
+    body.dark-mode .text-slate-800,
+    body.dark-mode .text-slate-700 { color: #f1f5f9 !important; }
+    body.dark-mode .text-slate-600,
+    body.dark-mode .text-slate-500 { color: #cbd5e1 !important; }
+    body.dark-mode .text-slate-400,
+    body.dark-mode .text-slate-300 { color: #94a3b8 !important; }
+    body.dark-mode input:not([type="checkbox"]),
+    body.dark-mode select,
+    body.dark-mode textarea {
+      background-color: #0f172a !important;
+      color: #f1f5f9 !important;
+      border-color: #475569 !important;
+    }
+    body.dark-mode input::placeholder { color: #94a3b8 !important; }
+    body.dark-mode .bg-blue-50 { background-color: #172554 !important; }
+    body.dark-mode .text-blue-700,
+    body.dark-mode .text-blue-600 { color: #93c5fd !important; }
+    body.dark-mode .border-blue-200 { border-color: #1d4ed8 !important; }
+    body.dark-mode .bg-amber-50 { background-color: #422006 !important; }
+    body.dark-mode .text-amber-700 { color: #fcd34d !important; }
+    body.dark-mode .border-amber-200 { border-color: #92400e !important; }
+    body.dark-mode .bg-emerald-50 { background-color: #064e3b !important; }
+    body.dark-mode .text-emerald-700 { color: #6ee7b7 !important; }
+    body.dark-mode .border-emerald-200 { border-color: #047857 !important; }
+    body.dark-mode .bg-teal-100 { background-color: #134e4a !important; }
+    body.dark-mode .text-teal-800 { color: #99f6e4 !important; }
+    body.dark-mode #tabs-container button:not(.bg-blue-600) {
+      background-color: #1e293b !important;
+      color: #cbd5e1 !important;
+    }
+    body.dark-mode #tabs-container button:not(.bg-blue-600) span:last-child {
+      background-color: #334155 !important;
+      color: #e2e8f0 !important;
+    }
+    body.dark-mode #retirada-modal > div,
+    body.dark-mode #detalhes-modal > div { background-color: #1e293b !important; }
+    body.dark-mode #retirada-modal .bg-slate-50,
+    body.dark-mode #detalhes-modal .bg-slate-50 { background-color: #273449 !important; }
+    body.dark-mode #retirada-modal .bg-blue-50 { background-color: #172554 !important; }
+    body.dark-mode #retirada-modal .text-blue-900 { color: #dbeafe !important; }
+    body.dark-mode #detalhes-modal .border-slate-100 { border-color: #475569 !important; }
+    body.dark-mode #theme-toggle { background-color: #334155 !important; color: #f8fafc !important; }
+    body.dark-mode #tutorial-modal > div { background-color: #1e293b !important; border-color: #475569 !important; }
+    body.dark-mode #tutorial-modal #tutorial-step-heading { color: #f1f5f9 !important; }
+    body.dark-mode #tutorial-modal #tutorial-step-description,
+    body.dark-mode #tutorial-modal #tutorial-step-label { color: #cbd5e1 !important; }
+    body.dark-mode #tutorial-modal #tutorial-step-tip { background-color: #273449 !important; border-color: #475569 !important; color: #cbd5e1 !important; }
+    body.dark-mode #tutorial-modal #tutorial-prev { color: #e2e8f0 !important; border-color: #475569 !important; }
+    body.dark-mode #tutorial-modal #tutorial-prev:hover { background-color: #334155 !important; }
+    body.dark-mode #tutorial-modal .bg-slate-100 { background-color: #334155 !important; }
+
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Header principal -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <!-- Logo AmorSaúde Redondinha -->
+        <div class="w-11 h-11 rounded-full overflow-hidden border-2 border-teal-500 shadow-sm flex-shrink-0 flex items-center justify-center bg-[#45b7c9]">
+          <svg viewBox="0 0 100 100" class="w-full h-full p-1">
+            <rect x="20" y="25" width="60" height="60" rx="15" fill="none" stroke="white" stroke-width="5"/>
+            <circle cx="38" cy="52" r="5" fill="white"/>
+            <circle cx="62" cy="52" r="5" fill="white"/>
+            <path d="M 38 65 Q 50 75 62 65" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="50" cy="25" r="14" fill="white"/>
+            <path d="M 50 17 C 45 12, 38 18, 50 29 C 62 18, 55 12, 50 17 Z" fill="#e53935"/>
+            <path d="M 50 20 V 26 M 47 23 H 53" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight flex items-center gap-1.5">
+            <span>RetiraFácil</span>
+            <span class="text-[10px] bg-teal-100 text-teal-800 font-bold px-2 py-0.5 rounded-full uppercase">AmorSaúde de Americana</span>
+          </h1>
+          <p class="text-xs text-slate-500 font-medium">Facilidade da entrega ao resultado.</p>
+        </div>
+      </div>
+
+      <!-- Ações do topo -->
+      <div class="flex items-center space-x-3">
+        <div id="sync-badge" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span id="sync-text">Sincronizado</span>
+        </div>
+
+          <button id="tutorial-toggle" type="button" onclick="openTutorial()"
+          class="flex items-center space-x-2 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition active:scale-95">
+          <i class="fa-solid fa-circle-question"></i>
+          <span>Como usar</span>
+        </button>
+
+        <button id="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Ativar modo escuro"
+          class="flex items-center space-x-2 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition active:scale-95">
+          <i id="theme-icon" class="fa-solid fa-moon"></i>
+          <span id="theme-label">Modo escuro</span>
+        </button>
+
+        <button onclick="syncWithSheets()" class="flex items-center space-x-2 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition active:scale-95">
+          <i id="sync-icon" class="fa-solid fa-rotate"></i>
+          <span>Atualizar</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navegação de Abas (Datas e Tipos de Exames - Dinâmica) -->
+    <div class="bg-slate-100/90 border-t border-slate-200 px-4 sm:px-6 lg:px-8 py-2">
+      <div class="max-w-7xl mx-auto flex items-center space-x-2 overflow-x-auto no-scrollbar scroll-smooth py-1" id="tabs-container">
+        <!-- As abas serão renderizadas dinamicamente aqui com contadores e estilo moderno -->
+      </div>
+    </div>
+  </header>
+
+  <!-- Conteúdo Principal -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Cards de Resumo -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500">Total no Filtro</p>
+          <h3 id="stat-total" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+          <i class="fa-solid fa-list-check text-lg"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500">Aguardando Retirada</p>
+          <h3 id="stat-pendentes" class="text-2xl font-bold text-amber-600 mt-1">0</h3>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+          <i class="fa-solid fa-clock text-lg"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500">Exames Entregues</p>
+          <h3 id="stat-entregues" class="text-2xl font-bold text-emerald-600 mt-1">0</h3>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+          <i class="fa-solid fa-circle-check text-lg"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filtros de Busca e Tabela -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <!-- Filtros superiores -->
+      <div class="p-4 border-b border-slate-200 flex flex-col md:flex-row gap-3 justify-between items-center bg-slate-50/50">
+        <!-- Campo de Pesquisa -->
+        <div class="relative w-full md:w-96">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input type="text" id="search-input" oninput="renderTable()" placeholder="Buscar nome do paciente ou exame..." class="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+        </div>
+
+        <!-- Filtro por Status -->
+        <div class="flex items-center space-x-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+          <button onclick="setStatusFilter('TODOS')" id="btn-status-todos" class="px-3 py-1.5 rounded-lg text-xs font-medium transition bg-slate-800 text-white shadow-sm">Todos</button>
+          <button onclick="setStatusFilter('PENDENTE')" id="btn-status-pendente" class="px-3 py-1.5 rounded-lg text-xs font-medium transition bg-white text-slate-600 hover:bg-slate-100 border border-slate-200">Pendentes</button>
+          <button onclick="setStatusFilter('ENTREGUE')" id="btn-status-entregue" class="px-3 py-1.5 rounded-lg text-xs font-medium transition bg-white text-slate-600 hover:bg-slate-100 border border-slate-200">Entregues</button>
+        </div>
+      </div>
+
+      <!-- Tabela de Pacientes -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr class="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-semibold text-xs uppercase tracking-wider">
+              <th class="py-3 px-4">Paciente</th>
+              <th class="py-3 px-4">Exame / Aba</th>
+              <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4">Quem Retirou</th>
+              <th class="py-3 px-4">Data Entrega</th>
+              <th class="py-3 px-4">Colaborador</th>
+              <th class="py-3 px-4 text-right">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="table-body" class="divide-y divide-slate-200">
+            <!-- As linhas serão renderizadas dinamicamente aqui -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Estado Vazio -->
+      <div id="empty-state" class="hidden p-12 text-center">
+        <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
+          <i class="fa-solid fa-folder-open text-2xl"></i>
+        </div>
+        <h3 class="text-slate-800 font-medium">Nenhum exame encontrado</h3>
+        <p class="text-xs text-slate-500 mt-1">Tente mudar o termo de busca ou selecione outra aba acima.</p>
+      </div>
+    </div>
+  </main>
+
+      <!-- Tutorial passo a passo -->
+  <div id="tutorial-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[70] hidden items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="tutorial-title" onclick="if(event.target===this) closeTutorial()">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden">
+      <div class="bg-blue-600 text-white px-5 py-4 flex items-center justify-between">
+        <div>
+          <p class="text-[11px] uppercase tracking-widest font-semibold text-blue-100">RetiraFácil • Guia rápido</p>
+          <h2 id="tutorial-title" class="text-lg font-bold">Como utilizar o sistema</h2>
+        </div>
+        <button type="button" onclick="closeTutorial()" class="text-white/90 hover:text-white p-2 rounded-lg" aria-label="Fechar tutorial">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-5 sm:p-6">
+        <div class="flex items-center justify-between mb-3">
+          <span id="tutorial-step-label" class="text-xs font-bold text-blue-700">Etapa 1 de 7</span>
+          <span id="tutorial-step-percent" class="text-xs text-slate-500">14%</span>
+        </div>
+        <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden mb-6">
+          <div id="tutorial-progress" class="h-full bg-blue-600 rounded-full" style="width:14.2857%"></div>
+        </div>
+
+        <div class="flex items-start gap-4 min-h-[190px]">
+          <div id="tutorial-step-icon" class="w-12 h-12 shrink-0 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <i class="fa-solid fa-arrows-left-right text-xl"></i>
+          </div>
+          <div>
+            <h3 id="tutorial-step-heading" class="text-base font-bold text-slate-900 mb-2">Escolha a aba do exame</h3>
+            <p id="tutorial-step-description" class="text-sm leading-relaxed text-slate-600">As abas ficam logo abaixo do cabeçalho. Selecione a aba correspondente ao exame ou escolha “TODAS AS ABAS” para visualizar os registros de todas elas.</p>
+            <p id="tutorial-step-tip" class="text-xs text-slate-500 mt-4 bg-slate-50 border border-slate-200 rounded-lg p-3"><strong>Dica:</strong> Os números exibidos nas abas ajudam a identificar a quantidade de registros.</p>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-3 border-t border-slate-200 pt-4 mt-3">
+          <button id="tutorial-prev" type="button" onclick="changeTutorialStep(-1)" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+            <i class="fa-solid fa-arrow-left mr-1"></i> Anterior
+          </button>
+          <button id="tutorial-next" type="button" onclick="changeTutorialStep(1)" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
+            Próximo <i class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmação / Edição de Entrega -->
+  <div id="retirada-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden transform transition-all">
+      <div class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-file-signature text-blue-400"></i>
+          <h3 class="font-bold text-base">Registrar Retirada de Exame</h3>
+        </div>
+        <button onclick="closeRetiradaModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="retirada-form" onsubmit="submitRetirada(event)" class="p-6 space-y-4">
+        <input type="hidden" id="form-id">
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Paciente</p>
+          <p id="form-paciente-nome" class="text-base font-bold text-slate-800">-</p>
+          <p id="form-exame-aba" class="text-xs text-blue-600 font-medium">-</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Quem está retirando? *</label>
+          <input type="text" id="form-quem-retirou" oninput="liveUpdateSheets()" required placeholder="Nome completo do paciente ou responsável" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Data da Retirada *</label>
+          <input type="date" id="form-data-retirada" onchange="liveUpdateSheets()" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Nome do Colaborador (Atendente) *</label>
+          <input type="text" id="form-colaborador" oninput="liveUpdateSheets()" required placeholder="Digite seu nome" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <!-- Termo de Confirmação Digital -->
+        <div class="bg-blue-50 p-3 rounded-xl border border-blue-200">
+          <label class="flex items-start space-x-2.5 cursor-pointer">
+            <input type="checkbox" id="form-confirm-check" required class="mt-0.5 rounded text-blue-600 focus:ring-blue-500">
+            <span class="text-xs text-blue-900 leading-tight">
+              Confirmo que conferi os documentos de identificação da pessoa que está retirando e atesto a entrega do laudo/exame.
+            </span>
+          </label>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-2">
+          <button type="button" onclick="closeRetiradaModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition">Cancelar</button>
+          <button type="submit" id="form-submit-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-md shadow-blue-200 transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>Confirmar Entrega</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal de Ver Detalhes (Comprovante Digital) -->
+  <div id="detalhes-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden transform transition-all">
+      <div class="bg-emerald-700 text-white px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-circle-check text-emerald-300 text-lg"></i>
+          <h3 class="font-bold text-base">Comprovante de Entrega</h3>
+        </div>
+        <button onclick="closeDetalhesModal()" class="text-emerald-200 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div class="border-b border-slate-200 pb-3">
+          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Paciente</p>
+          <p id="det-paciente-nome" class="text-lg font-bold text-slate-800 mt-0.5">-</p>
+          <span id="det-exame-aba" class="inline-block mt-1 px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-200">-</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Quem Retirou</p>
+            <p id="det-quem-retirou" class="font-medium text-slate-700 mt-0.5">-</p>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Data da Entrega</p>
+            <p id="det-data-retirada" class="font-medium text-slate-700 mt-0.5">-</p>
+          </div>
+        </div>
+
+        <!-- Carimbo da Assinatura Digital do Atendente -->
+        <div class="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1 text-xs">
+          <div class="flex items-center space-x-1.5 text-slate-500 font-semibold uppercase tracking-wider">
+            <i class="fa-solid fa-certificate text-emerald-600"></i>
+            <span>Autenticação Digital</span>
+          </div>
+          <p id="det-colaborador" class="font-mono text-slate-700 text-xs break-all pt-1">-</p>
+        </div>
+
+        <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+          <button type="button" id="det-btn-editar" class="text-xs text-blue-600 hover:underline font-semibold flex items-center space-x-1">
+            <i class="fa-solid fa-pen"></i>
+            <span>Editar Registro</span>
+          </button>
+
+          <button type="button" onclick="closeDetalhesModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg transition">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast de Notificação -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div id="toast-body" class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg border border-slate-800 flex items-center space-x-3 text-sm">
+      <i id="toast-icon" class="fa-solid fa-circle-info text-blue-400"></i>
+      <span id="toast-msg">Mensagem do sistema</span>
+    </div>
+  </div>
+
+  <script>
+
+        // TEMA CLARO/ESCURO — preferência salva neste navegador
+    function applyTheme(theme) {
+      const isDark = theme === 'dark';
+      document.body.classList.toggle('dark-mode', isDark);
+      const icon = document.getElementById('theme-icon');
+      const label = document.getElementById('theme-label');
+      const button = document.getElementById('theme-toggle');
+      if (icon) icon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+      if (label) label.innerText = isDark ? 'Modo claro' : 'Modo escuro';
+      if (button) button.setAttribute('aria-label', isDark ? 'Ativar modo claro' : 'Ativar modo escuro');
+    }
+
+    function initTheme() {
+      const savedTheme = localStorage.getItem('retirafacil_theme') || 'light';
+      applyTheme(savedTheme);
+    }
+
+    function toggleTheme() {
+      const nextTheme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
+      localStorage.setItem('retirafacil_theme', nextTheme);
+      applyTheme(nextTheme);
+    }
+
+// TUTORIAL INTERATIVO — guia passo a passo do sistema
+    const tutorialSteps = [
+      {
+        icon: 'fa-solid fa-folder-open',
+        title: 'Escolha a aba do exame',
+        description: 'As abas ficam logo abaixo do cabeçalho. Selecione a aba correspondente ao exame ou escolha “TODAS AS ABAS” para visualizar os registros de todas elas.',
+        tip: 'Os números exibidos nas abas ajudam a identificar a quantidade de registros.'
+      },
+      {
+        icon: 'fa-solid fa-magnifying-glass',
+        title: 'Pesquise um paciente ou exame',
+        description: 'Use o campo de busca para localizar registros. Você pode digitar o nome do paciente, o nome do exame ou o nome de quem retirou.',
+        tip: 'A pesquisa funciona junto com a aba e o filtro de status selecionados.'
+      },
+      {
+        icon: 'fa-solid fa-filter',
+        title: 'Filtre pelo status',
+        description: 'Use os botões “Todos”, “Pendentes” e “Entregues” para visualizar todos os registros, somente os que aguardam retirada ou somente os que já foram entregues.',
+        tip: 'Os cards no alto da página mostram os totais conforme a aba selecionada.'
+      },
+      {
+        icon: 'fa-solid fa-hand-holding-medical',
+        title: 'Inicie o registro da entrega',
+        description: 'Quando localizar o exame pendente, clique no botão “Entregar” na linha do paciente. Será aberta a tela de registro da retirada.',
+        tip: 'Antes de confirmar, confira se o paciente e o exame exibidos correspondem ao registro correto.'
+      },
+      {
+        icon: 'fa-solid fa-pen-to-square',
+        title: 'Preencha os dados da retirada',
+        description: 'Informe quem está retirando (paciente ou responsável), a data da retirada e o nome do colaborador atendente. Os campos marcados com asterisco são obrigatórios.',
+        tip: 'Confira os nomes e a data antes de prosseguir. O sistema pode atualizar um rascunho enquanto você preenche os campos.'
+      },
+      {
+        icon: 'fa-solid fa-shield-halved',
+        title: 'Confira e confirme a entrega',
+        description: 'Verifique os documentos de identificação de quem está retirando. Marque a confirmação digital e clique em “Confirmar Entrega” para concluir o registro.',
+        tip: 'A confirmação digital declara que os documentos foram conferidos e que o laudo/exame foi entregue.'
+      },
+      {
+        icon: 'fa-solid fa-receipt',
+        title: 'Consulte os detalhes e acompanhe a sincronização',
+        description: 'Depois da entrega, o status passa para “Entregue”. Clique em “Ver Detalhes” para consultar o comprovante. O sistema também sincroniza os dados com a planilha; use “Atualizar” para solicitar uma nova sincronização.',
+        tip: 'Observe o indicador no cabeçalho: ele informa quando o sistema está sincronizando ou quando está em modo offline.'
+      }
+    ];
+    let currentTutorialStep = 0;
+
+    function renderTutorialStep() {
+      const step = tutorialSteps[currentTutorialStep];
+      const total = tutorialSteps.length;
+      const percent = Math.round(((currentTutorialStep + 1) / total) * 100);
+      document.getElementById('tutorial-step-label').innerText = `Etapa ${currentTutorialStep + 1} de ${total}`;
+      document.getElementById('tutorial-step-percent').innerText = `${percent}%`;
+      document.getElementById('tutorial-progress').style.width = `${percent}%`;
+      document.getElementById('tutorial-step-icon').innerHTML = `<i class="${step.icon} text-xl"></i>`;
+      document.getElementById('tutorial-step-heading').innerText = step.title;
+      document.getElementById('tutorial-step-description').innerText = step.description;
+      document.getElementById('tutorial-step-tip').innerHTML = `<strong>Dica:</strong> ${step.tip}`;
+      document.getElementById('tutorial-prev').disabled = currentTutorialStep === 0;
+      const nextButton = document.getElementById('tutorial-next');
+      nextButton.innerHTML = currentTutorialStep === total - 1
+        ? 'Concluir <i class="fa-solid fa-check ml-1"></i>'
+        : 'Próximo <i class="fa-solid fa-arrow-right ml-1"></i>';
+    }
+
+    function openTutorial() {
+      currentTutorialStep = 0;
+      renderTutorialStep();
+      const modal = document.getElementById('tutorial-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeTutorial() {
+      const modal = document.getElementById('tutorial-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function changeTutorialStep(direction) {
+      const nextStep = currentTutorialStep + direction;
+      if (nextStep < 0) return;
+      if (nextStep >= tutorialSteps.length) {
+        closeTutorial();
+        return;
+      }
+      currentTutorialStep = nextStep;
+      renderTutorialStep();
+    }
+
+    document.addEventListener('keydown', function(event) {
+      const modal = document.getElementById('tutorial-modal');
+      if (!modal || modal.classList.contains('hidden')) return;
+      if (event.key === 'Escape') closeTutorial();
+      if (event.key === 'ArrowRight') changeTutorialStep(1);
+      if (event.key === 'ArrowLeft') changeTutorialStep(-1);
+    });
+
+
+
+    // CONFIGURAÇÃO DO GOOGLE APPS SCRIPT
+    const apiUrl = 'https://script.google.com/macros/s/AKfycbxfHGtQIGgCkES5TIe6-lIwgvWn1dAX9A_0K6nR2LWT8Ciz4jrkH57h_T3HMOdwlOWKZg/exec';
+
+    // ESTADO DA APLICAÇÃO
+    let examesData = []; // [{ id, paciente, aba, status, quemRetirou, dataRetirada, colaborador }]
+    let abasDisponiveis = [];
+    let currentTab = 'TODAS AS ABAS';
+    let currentStatusFilter = 'TODOS';
+    let isSyncing = false;
+    let liveSyncTimer = null;
+
+    // CARREGAMENTO INICIAL
+    window.onload = function() {
+      loadLocalData();
+      syncWithSheets();
+      // Atualizar dados em segundo plano a cada 15 segundos
+      setInterval(syncWithSheets, 15000);
+    };
+
+    // FORMATAR DATA BR
+    function formatDateBR(dateStr) {
+      if (!dateStr) return '';
+      if (dateStr.includes('/')) return dateStr;
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      return dateStr;
+    }
+
+    // ARMAZENAMENTO LOCAL
+    function loadLocalData() {
+      try {
+        const saved = localStorage.getItem('exames_data_v2');
+        if (saved) examesData = JSON.parse(saved);
+      } catch (e) {
+        examesData = [];
+      }
+      renderTabs();
+      renderTable();
+      updateStats();
+    }
+
+    function saveLocalData() {
+      localStorage.setItem('exames_data_v2', JSON.stringify(examesData));
+    }
+
+    // SINCRONIZAÇÃO COM PLANILHA (JSONP FALLBACK)
+    function syncWithSheets() {
+      if (isSyncing) return;
+      isSyncing = true;
+
+      const syncIcon = document.getElementById('sync-icon');
+      const syncText = document.getElementById('sync-text');
+      if (syncIcon) syncIcon.classList.add('fa-spin');
+      if (syncText) syncText.innerText = 'Sincronizando...';
+
+      const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+      window[callbackName] = function(data) {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        processSheetData(data);
+        isSyncing = false;
+        if (syncIcon) syncIcon.classList.remove('fa-spin');
+        if (syncText) syncText.innerText = 'Sincronizado';
+      };
+
+      const script = document.createElement('script');
+      script.src = `${apiUrl}?prefix=${callbackName}&t=${Date.now()}`;
+      
+      // FALLBACK PARA NAVEGADORES MÓVEIS (CELULARES)
+      const mobileTimeout = setTimeout(() => {
+        if (isSyncing) {
+          fetch(`${apiUrl}?t=${Date.now()}`)
+            .then(res => res.json())
+            .then(data => {
+              if (window[callbackName]) delete window[callbackName];
+              if (script.parentNode) script.parentNode.removeChild(script);
+              processSheetData(data);
+              isSyncing = false;
+              if (syncIcon) syncIcon.classList.remove('fa-spin');
+              if (syncText) syncText.innerText = 'Sincronizado';
+            })
+            .catch(() => {
+              // Mantém gracioso no offline se realmente não houver internet
+            });
+        }
+      }, 3000);
+
+      script.onerror = function() {
+        clearTimeout(mobileTimeout);
+        delete window[callbackName];
+        if (script.parentNode) document.body.removeChild(script);
+        isSyncing = false;
+        if (syncIcon) syncIcon.classList.remove('fa-spin');
+        if (syncText) syncText.innerText = 'Modo Offline';
+      };
+      document.body.appendChild(script);
+    }
+
+    function processSheetData(sheets) {
+      if (!Array.isArray(sheets)) return;
+
+      let newExamesData = [];
+      abasDisponiveis = [];
+
+      sheets.forEach(s => {
+        const abaNome = s.aba;
+        if (!abasDisponiveis.includes(abaNome)) abasDisponiveis.push(abaNome);
+
+        const rows = s.dados || [];
+        // Pula o cabeçalho (i = 1)
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          const paciente = (row[0] || '').toString().trim();
+          if (!paciente) continue;
+
+          const colH = (row[7] || '').toString().trim();
+          const colI = (row[8] || '').toString().trim();
+          const colJ = (row[9] || '').toString().trim();
+          const colK = (row[10] || '').toString().trim();
+
+          const isEntregue = colH.toUpperCase().includes('ENTREGUE') || 
+                            colH.toUpperCase().includes('SIM') || 
+                            colH.toUpperCase().includes('OK') || 
+                            colI !== '' || colJ !== '';
+
+          const itemId = `${abaNome}_${paciente}`.replace(/\s+/g, '_');
+
+          // Preserva edições locais não concluídas se existirem
+          const existing = examesData.find(e => e.id === itemId);
+
+          newExamesData.push({
+            id: itemId,
+            paciente: paciente,
+            aba: abaNome,
+            status: isEntregue ? 'ENTREGUE' : (existing ? existing.status : 'PENDENTE'),
+            quemRetirou: colJ || (existing ? existing.quemRetirou : ''),
+            dataRetirada: formatDateBR(colI || (existing ? existing.dataRetirada : '')),
+            colaborador: colK || (existing ? existing.colaborador : '')
+          });
+        }
+      });
+
+      examesData = newExamesData;
+      saveLocalData();
+      renderTabs();
+      renderTable();
+      updateStats();
+    }
+
+    // RENDERIZAR ABAS
+    function renderTabs() {
+      const container = document.getElementById('tabs-container');
+      if (!container) return;
+
+      let html = `
+        <button onclick="setTab('TODAS AS ABAS')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${currentTab === 'TODAS AS ABAS' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-200'}">
+          <i class="fa-solid fa-layer-group"></i>
+          <span>Todas as Abas</span>
+          <span class="ml-1 px-1.5 py-0.2 text-[10px] rounded-full ${currentTab === 'TODAS AS ABAS' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-600'}">${examesData.length}</span>
+        </button>
+      `;
+
+      abasDisponiveis.forEach(aba => {
+        const count = examesData.filter(e => e.aba === aba).length;
+        const active = currentTab === aba;
+        html += `
+          <button onclick="setTab('${aba}')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${active ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-200'}">
+            <span>${aba}</span>
+            <span class="ml-1 px-1.5 py-0.2 text-[10px] rounded-full ${active ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-600'}">${count}</span>
+          </button>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function setTab(aba) {
+      currentTab = aba;
+      renderTabs();
+      renderTable();
+      updateStats();
+    }
+
+    function setStatusFilter(filter) {
+      currentStatusFilter = filter;
+      ['TODOS', 'PENDENTE', 'ENTREGUE'].forEach(f => {
+        const btn = document.getElementById(`btn-status-${f.toLowerCase()}`);
+        if (btn) {
+          if (f === filter) {
+            btn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition bg-slate-800 text-white shadow-sm';
+          } else {
+            btn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition bg-white text-slate-600 hover:bg-slate-100 border border-slate-200';
+          }
+        }
+      });
+      renderTable();
+      updateStats();
+    }
+
+    // RENDERIZAR TABELA
+    function renderTable() {
+      const tbody = document.getElementById('table-body');
+      const emptyState = document.getElementById('empty-state');
+      const searchVal = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+
+      if (!tbody) return;
+
+      let filtered = examesData.filter(item => {
+        const matchesTab = currentTab === 'TODAS AS ABAS' || item.aba === currentTab;
+        const matchesStatus = currentStatusFilter === 'TODOS' || item.status === currentStatusFilter;
+        const matchesSearch = item.paciente.toLowerCase().includes(searchVal) || 
+                              item.aba.toLowerCase().includes(searchVal) || 
+                              (item.quemRetirou && item.quemRetirou.toLowerCase().includes(searchVal));
+
+        return matchesTab && matchesStatus && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        if (emptyState) emptyState.classList.remove('hidden');
+        return;
+      }
+
+      if (emptyState) emptyState.classList.add('hidden');
+
+      let html = '';
+      filtered.forEach(item => {
+        const isEntregue = item.status === 'ENTREGUE';
+        const badgeStatus = isEntregue 
+          ? `<span class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-circle-check text-[10px]"></i><span>Entregue</span></span>`
+          : `<span class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-clock text-[10px]"></i><span>Aguardando</span></span>`;
+
+        const btnAcao = isEntregue
+          ? `<button onclick="openDetalhesModal('${item.id}')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition flex items-center space-x-1"><i class="fa-solid fa-eye text-slate-500"></i><span>Ver Detalhes</span></button>`
+          : `<button onclick="openRetiradaModal('${item.id}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center space-x-1"><i class="fa-solid fa-hand-holding-medical"></i><span>Entregar</span></button>`;
+
+        html += `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="py-3 px-4 font-semibold text-slate-800">${item.paciente}</td>
+            <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-xs border border-slate-200">${item.aba}</span></td>
+            <td class="py-3 px-4">${badgeStatus}</td>
+            <td class="py-3 px-4 text-slate-600 font-medium">${item.quemRetirou || '<span class="text-slate-300">-</span>'}</td>
+            <td class="py-3 px-4 text-slate-600 text-xs">${item.dataRetirada || '<span class="text-slate-300">-</span>'}</td>
+            <td class="py-3 px-4 text-slate-500 text-xs truncate max-w-[150px]">${item.colaborador || '<span class="text-slate-300">-</span>'}</td>
+            <td class="py-3 px-4 text-right">${btnAcao}</td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    // ATUALIZAR ESTATÍSTICAS
+    function updateStats() {
+      const list = examesData.filter(i => currentTab === 'TODAS AS ABAS' || i.aba === currentTab);
+      const pendentes = list.filter(i => i.status !== 'ENTREGUE').length;
+      const entregues = list.filter(i => i.status === 'ENTREGUE').length;
+
+      const elTotal = document.getElementById('stat-total');
+      const elPendentes = document.getElementById('stat-pendentes');
+      const elEntregues = document.getElementById('stat-entregues');
+
+      if (elTotal) elTotal.innerText = list.length;
+      if (elPendentes) elPendentes.innerText = pendentes;
+      if (elEntregues) elEntregues.innerText = entregues;
+    }
+
+    // MODAL DE REGISTRO DE RETIRADA
+    function openRetiradaModal(id) {
+      const item = examesData.find(i => i.id === id);
+      if (!item) return;
+
+      document.getElementById('form-id').value = item.id;
+      document.getElementById('form-paciente-nome').innerText = item.paciente;
+      document.getElementById('form-exame-aba').innerText = `Aba / Exame: ${item.aba}`;
+      document.getElementById('form-quem-retirou').value = item.quemRetirou || item.paciente;
+
+      // Data de hoje por padrão se não houver
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('form-data-retirada').value = today;
+      document.getElementById('form-colaborador').value = item.colaborador ? item.colaborador.split(' ')[0] : '';
+      document.getElementById('form-confirm-check').checked = false;
+
+      document.getElementById('retirada-modal').classList.remove('hidden');
+    }
+
+    function closeRetiradaModal() {
+      document.getElementById('retirada-modal').classList.add('hidden');
+    }
+
+    // ATUALIZAR EM TEMPO REAL CONFORME DIGITA
+    function liveUpdateSheets() {
+      const id = document.getElementById('form-id').value;
+      const item = examesData.find(i => i.id === id);
+      if (!item) return;
+
+      const quemRetirou = document.getElementById('form-quem-retirou').value.trim();
+      const dataRetiradaISO = document.getElementById('form-data-retirada').value;
+      const dataRetiradaBR = formatDateBR(dataRetiradaISO);
+      const colaboradorNome = document.getElementById('form-colaborador').value.trim().toUpperCase();
+
+      // Atualizar objeto local
+      item.quemRetirou = quemRetirou;
+      item.dataRetirada = dataRetiradaBR;
+      saveLocalData();
+      renderTable();
+
+      // Indicador visual de salvando
+      const syncText = document.getElementById('sync-text');
+      const syncIcon = document.getElementById('sync-icon');
+      if (syncIcon) syncIcon.classList.add('fa-spin');
+      if (syncText) syncText.innerText = 'Salvando...';
+
+      // Envia com pausa de digitação (400ms)
+      clearTimeout(liveSyncTimer);
+      liveSyncTimer = setTimeout(() => {
+        sendUpdateToSheets(item, quemRetirou, dataRetiradaBR, colaboradorNome ? `${colaboradorNome} [Rascunho]` : item.colaborador);
+      }, 400);
+    }
+
+    // ENVIAR FORMULÁRIO DE RETIRADA
+    function submitRetirada(e) {
+      e.preventDefault();
+
+      const id = document.getElementById('form-id').value;
+      const item = examesData.find(i => i.id === id);
+      if (!item) return;
+
+      const quemRetirou = document.getElementById('form-quem-retirou').value.trim();
+      const dataRetiradaISO = document.getElementById('form-data-retirada').value;
+      const dataRetiradaBR = formatDateBR(dataRetiradaISO);
+      const colaboradorNome = document.getElementById('form-colaborador').value.trim().toUpperCase();
+
+      const now = new Date();
+      const horaStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const randomHash = Math.random().toString(36).substring(2, 7).toUpperCase();
+      const carimboDigital = `${colaboradorNome} [${dataRetiradaBR} ${horaStr}] - HASH: #${randomHash}`;
+
+      item.status = 'ENTREGUE';
+      item.quemRetirou = quemRetirou;
+      item.dataRetirada = dataRetiradaBR;
+      item.colaborador = carimboDigital;
+
+      saveLocalData();
+      renderTable();
+      updateStats();
+      closeRetiradaModal();
+
+      showToast('Entrega registrada com sucesso!', 'success');
+      sendUpdateToSheets(item, quemRetirou, dataRetiradaBR, carimboDigital);
+    }
+
+    // ENVIAR DADOS ATUALIZADOS PARA A PLANILHA DO GOOGLE
+    function sendUpdateToSheets(item, quemRetirou, dataEntrega, colaboradorStamp) {
+      const syncText = document.getElementById('sync-text');
+      const syncIcon = document.getElementById('sync-icon');
+      if (syncIcon) syncIcon.classList.add('fa-spin');
+      if (syncText) syncText.innerText = 'Salvando...';
+
+      const callbackName = 'jsonp_save_' + Math.round(100000 * Math.random());
+      
+      const queryParams = [
+        `aba=${encodeURIComponent(item.aba)}`,
+        `paciente=${encodeURIComponent(item.paciente)}`,
+        `status=${encodeURIComponent(item.status || 'ENTREGUE')}`,
+        `retiradoPor=${encodeURIComponent(quemRetirou || '')}`,
+        `dataEntrega=${encodeURIComponent(dataEntrega || '')}`,
+        `colaborador=${encodeURIComponent(colaboradorStamp || '')}`,
+        `prefix=${callbackName}`,
+        `t=${Date.now()}`
+      ].join('&');
+
+      const fullUrl = `${apiUrl}?${queryParams}`;
+
+      window[callbackName] = function(res) {
+        delete window[callbackName];
+        if (script && script.parentNode) script.parentNode.removeChild(script);
+        if (syncIcon) syncIcon.classList.remove('fa-spin');
+        if (syncText) syncText.innerText = 'Sincronizado';
+      };
+
+      const script = document.createElement('script');
+      script.src = fullUrl;
+      
+      script.onerror = function() {
+        delete window[callbackName];
+        if (script && script.parentNode) script.parentNode.removeChild(script);
+        
+        // Tentativa de envio com suporte a imagem/beacon para contornar bloqueios de navegador
+        const img = new Image();
+        img.src = fullUrl;
+        
+        setTimeout(() => {
+          if (syncIcon) syncIcon.classList.remove('fa-spin');
+          if (syncText) syncText.innerText = 'Sincronizado';
+        }, 1000);
+      };
+
+      document.body.appendChild(script);
+    }
+
+    // MODAL DE DETALHES (COMPROVANTE DIGITAL)
+    function openDetalhesModal(id) {
+      const item = examesData.find(i => i.id === id);
+      if (!item) return;
+
+      document.getElementById('det-paciente-nome').innerText = item.paciente;
+      document.getElementById('det-exame-aba').innerText = item.aba;
+      document.getElementById('det-quem-retirou').innerText = item.quemRetirou || '-';
+      document.getElementById('det-data-retirada').innerText = formatDateBR(item.dataRetirada);
+      document.getElementById('det-colaborador').innerText = item.colaborador || 'Confirmado via sistema';
+
+      document.getElementById('det-btn-editar').onclick = function() {
+        closeDetalhesModal();
+        openRetiradaModal(item.id);
+      };
+
+      document.getElementById('detalhes-modal').classList.remove('hidden');
+    }
+
+    function closeDetalhesModal() {
+      document.getElementById('detalhes-modal').classList.add('hidden');
+    }
+
+    // EXIBIR NOTIFICAÇÃO (TOAST)
+    function showToast(msg, type = 'info') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      const toastIcon = document.getElementById('toast-icon');
+
+      if (!toast || !toastMsg || !toastIcon) return;
+
+      toastMsg.innerText = msg;
+
+      if (type === 'success') {
+        toastIcon.className = "fa-solid fa-circle-check text-emerald-400";
+      } else {
+        toastIcon.className = "fa-solid fa-circle-info text-blue-400";
+      }
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3500);
+    }
+  </script>
+</body>
+</html>
