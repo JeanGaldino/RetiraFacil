@@ -1,5 +1,5 @@
 // Configurações do Google Apps Script
-const API_URL = "https://script.google.com/macros/s/AKfycbw5Y5y0gI5ZOvNGoIWHXJyOS3Ga0AdD2OgZo7Pr159M5oobq18UA4KX73x-1X4eyzRgPw/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwjiaqxp0WdJSW3hx4BBJkZ67oyUHLHr0sUsmMc_iM6UvVDwvagswz1UdQ5Aumy3OiSEg/exec";
 
 // Estado da Aplicação
 let sheetsData = [];
