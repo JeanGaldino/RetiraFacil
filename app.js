@@ -3,7 +3,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbx-EwgEUAXBpaukAR092P-c
 
 // Estado da Aplicação
 let sheetsData = [];
-let currentAbaIndex = 'all';
+let currentAbaIndex = 0;
 let isSyncing = false;
 let lastSyncSnapshot = null;
 let currentEditingPaciente = null;
@@ -61,7 +61,10 @@ function updateThemeIcon(isDark) {
 
 // --- CARREGAMENTO DE DADOS E SINCRONIZAÇÃO DA PLANILHA ---
 function syncWithSheets(manual = false) {
-  if (isSyncing) return;
+  if (isSyncing) {
+    if (manual) showToast('A sincronização já está em andamento. Aguarde alguns segundos.', 'info');
+    return;
+  }
   isSyncing = true;
 
   updateSyncStatus('syncing', manual ? 'Atualizando...' : 'Sincronizando...');
@@ -128,9 +131,12 @@ function syncWithSheets(manual = false) {
   // Se o navegador carregar uma página, mas o callback JSONP não for executado,
   // normalmente a implantação não está pública ou a resposta não é JSONP.
   scriptElement.onload = function() {
-    if (!finished) {
-      finishSync(false, null, 'O Google respondeu, mas não enviou os dados no formato esperado. Publique uma nova versão do Apps Script.');
-    }
+    // Aguarda o callback JSONP terminar antes de considerar a resposta inválida.
+    setTimeout(() => {
+      if (!finished) {
+        finishSync(false, null, 'O Web App respondeu, mas não executou o callback JSONP. Verifique a função doGet(e), o parâmetro prefix e a implantação do Apps Script.');
+      }
+    }, 1000);
   };
 
   scriptElement.src = API_URL + '?prefix=' + encodeURIComponent(callbackName) + '&t=' + Date.now();
@@ -174,14 +180,22 @@ function populateAbasSelect() {
     select.appendChild(opt);
   });
   
-  // Na primeira abertura, iniciar sempre em "Todas as abas".
-  // Nas sincronizações seguintes, preservar a aba que o usuário escolheu.
-  if (savedValue === 'all' || (savedValue !== '' && select.options[savedValue])) {
-    select.value = savedValue;
-    currentAbaIndex = savedValue === 'all' ? 'all' : parseInt(savedValue, 10);
-  } else {
+  // Preserva a seleção atual. Na primeira abertura, seleciona a primeira aba individual.
+  const savedIndex = Number(savedValue);
+  const savedIsValidSheet = savedValue !== '' &&
+    Number.isInteger(savedIndex) &&
+    savedIndex >= 0 &&
+    savedIndex < sheetsData.length;
+
+  if (savedValue === 'all') {
     select.value = 'all';
     currentAbaIndex = 'all';
+  } else if (savedIsValidSheet) {
+    select.value = String(savedIndex);
+    currentAbaIndex = savedIndex;
+  } else {
+    select.value = '0';
+    currentAbaIndex = 0;
   }
 }
 
