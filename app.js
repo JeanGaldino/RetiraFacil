@@ -1,5 +1,5 @@
 // Configurações do Google Apps Script
-const API_URL = "https://script.google.com/macros/s/AKfycbwjiaqxp0WdJSW3hx4BBJkZ67oyUHLHr0sUsmMc_iM6UvVDwvagswz1UdQ5Aumy3OiSEg/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbx-EwgEUAXBpaukAR092P-ckdGKB-sgsK5CztZdVYg8JuBdjlKTVUW43B4ymjMrrBMKmQ/exec";
 
 // Estado da Aplicação
 let sheetsData = [];
@@ -240,7 +240,7 @@ function renderTable() {
       
       const dataRetirada = row[4] ? String(row[4]).trim() : '';
       const assinatura = row[6] ? String(row[6]).trim() : '';
-      const quemRetirou = row[9] ? String(row[9]).trim() : '';
+      const quemRetirou = row[8] ? String(row[8]).trim() : '';
 
       // Filtro de Busca
       if (searchTerm) {

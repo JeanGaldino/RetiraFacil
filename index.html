@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RetiraFácil - AmorSaúde</title>
+  <title>RetiraFácil</title>
   
   <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%2345b7c9'/><rect x='25' y='30' width='50' height='50' rx='10' fill='none' stroke='white' stroke-width='6'/><circle cx='50' cy='28' r='12' fill='%2345b7c9' stroke='white' stroke-width='4'/><path d='M50 22 C47 18 41 20 41 24 C41 28 50 33 50 33 C50 33 59 28 59 24 C59 20 53 18 50 22 Z' fill='%23e53e3e'/><circle cx='40' cy='50' r='4' fill='white'/><circle cx='60' cy='50' r='4' fill='white'/><path d='M40 60 Q50 68 60 60' fill='none' stroke='white' stroke-width='4' stroke-linecap='round'/></svg>">
-  
+  <link rel="icon" type="image/png" href="style/logo.png">  
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -35,16 +34,12 @@
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
       
       <!-- LOGO + MARCA -->
-      <div class="flex items-center gap-3">
-        <div class="w-11 h-11 rounded-full bg-[#45b7c9] flex items-center justify-center shadow-md p-1.5 flex-shrink-0">
-          <svg class="w-full h-full text-white" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="20" y="28" width="60" height="58" rx="14" stroke="currentColor" stroke-width="7" fill="none"/>
-            <circle cx="50" cy="26" r="14" fill="#45b7c9" stroke="currentColor" stroke-width="5"/>
-            <path d="M50 20 C46 15 38 18 38 23 C38 28 50 34 50 34 C50 34 62 28 62 23 C62 18 54 15 50 20 Z" fill="#e53e3e"/>
-            <circle cx="38" cy="50" r="4.5" fill="currentColor"/>
-            <circle cx="62" cy="50" r="4.5" fill="currentColor"/>
-            <path d="M38 62 Q50 72 62 62" stroke="currentColor" stroke-width="5" stroke-linecap="round" fill="none"/>
-          </svg>
+<div class="flex items-center gap-3">
+    <!-- Adicionado 'overflow-hidden' no container principal -->
+    <div class="w-11 h-11 rounded-full bg-[#45b7c9] flex items-center justify-center shadow-md overflow-hidden flex-shrink-0">
+      <img src="style/logo.png" alt="Avatar" class="w-full h-full object-cover">
+    </div>
+    <div>
         </div>
         <div>
           <h1 class="text-xl font-bold text-slate-800 dark:text-white tracking-tight leading-none flex items-center gap-2">
@@ -232,7 +227,7 @@
   <!-- RODAPÉ -->
   <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-4 mt-auto transition-colors">
     <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
-      RetiraFácil AmorSaúde &copy; 2026 — Todos os direitos reservados.
+      RetiraFácil AmorSaúde de Americana &copy; 2026 — Todos os direitos reservados.
     </div>
   </footer>
 
