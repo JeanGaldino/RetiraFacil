@@ -323,41 +323,46 @@ let currentAbaIndexForSave = 0;
 
 function confirmarEntregaAction() {
   const paciente = currentEditingPaciente;
-  const retiradoPor = document.getElementById('modal-retirado-por').value.trim();
-  const colaborador = document.getElementById('modal-colaborador').value.trim();
-  
+  const retiradoPorEl = document.getElementById('modal-retirado-por');
+  const colaboradorEl = document.getElementById('modal-colaborador');
+  const retiradoPor = retiradoPorEl ? retiradoPorEl.value.trim() : '';
+  const colaborador = colaboradorEl ? colaboradorEl.value.trim() : '';
+
+  if (!paciente) {
+    showToast('Não foi possível identificar o paciente. Feche e abra o modal novamente.', 'warning');
+    return;
+  }
+
   if (!retiradoPor || !colaborador) {
     showToast('Por favor, preencha quem retirou e o seu nome!', 'warning');
     return;
   }
 
-  localStorage.setItem('retirafacil_colaborador', colaborador);
+  const abaIdx = Number(currentAbaIndexForSave);
+  const abaSelecionada = sheetsData[abaIdx];
+  if (!abaSelecionada || !abaSelecionada.aba) {
+    showToast('Não foi possível identificar a aba do exame. Atualize a página e tente novamente.', 'warning');
+    return;
+  }
 
-  // Obtém o nome exato da aba onde o registro está alocado
-  const abaIdx = currentAbaIndexForSave === 'all' ? 0 : currentAbaIndexForSave;
-  const abaNome = sheetsData[abaIdx].aba;
-  
+  const abaNome = abaSelecionada.aba;
   const now = new Date();
   const dataHoje = now.toLocaleDateString('pt-BR');
   const horaHoje = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const hash = '#' + Math.random().toString(36).substring(2, 7).toUpperCase();
-  
   const assinaturaFormatada = `${colaborador.toUpperCase()} [ENTREGA DIGITAL: ${dataHoje} ${horaHoje} - HASH: ${hash}]`;
 
-  closeModal();
+  localStorage.setItem('retirafacil_colaborador', colaborador);
+  const confirmarBtn = document.querySelector('#modal-entrega button[onclick="confirmarEntregaAction()"]');
+  if (confirmarBtn) {
+    confirmarBtn.disabled = true;
+    confirmarBtn.dataset.originalText = confirmarBtn.innerText;
+    confirmarBtn.innerText = 'Enviando...';
+  }
+
   showToast('Enviando para a planilha...', 'info');
 
-  const callbackName = 'jsonp_save_' + Math.round(100000 * Math.random());
-  
-  window[callbackName] = function(res) {
-    delete window[callbackName];
-    if (scriptElement && scriptElement.parentNode) {
-      scriptElement.parentNode.removeChild(scriptElement);
-    }
-    showToast('Entrega gravada com sucesso!', 'success');
-    syncWithSheets(true);
-  };
-
+  const callbackName = 'jsonp_save_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
   const params = [
     `aba=${encodeURIComponent(abaNome)}`,
     `paciente=${encodeURIComponent(paciente)}`,
@@ -369,16 +374,72 @@ function confirmarEntregaAction() {
   ].join('&');
 
   const scriptElement = document.createElement('script');
-  scriptElement.src = `${API_URL}?${params}`;
-  
-  scriptElement.onerror = function() {
+  let finished = false;
+  const timeoutId = setTimeout(() => {
+    finishSave(false, 'A planilha não confirmou o recebimento. Verifique a conexão e atualize os dados antes de tentar novamente.');
+  }, 20000);
+
+  function finishSave(success, message) {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timeoutId);
     delete window[callbackName];
     if (scriptElement.parentNode) scriptElement.parentNode.removeChild(scriptElement);
-    showToast('Processado! Atualizando dados...', 'success');
-    syncWithSheets(true);
+    if (confirmarBtn) {
+      confirmarBtn.disabled = false;
+      confirmarBtn.innerText = confirmarBtn.dataset.originalText || 'Assinar & Confirmar';
+    }
+
+    if (success) {
+      closeModal();
+      currentEditingPaciente = null;
+      showToast(message || 'Entrega gravada com sucesso!', 'success');
+      syncWithSheets(true);
+    } else {
+      showToast(message || 'Não foi possível confirmar a gravação. Tente novamente.', 'warning');
+    }
+  }
+
+  window[callbackName] = function(res) {
+    // O Apps Script deve retornar { success: true } após concluir a gravação.
+    if (res && res.success === false) {
+      finishSave(false, res.message || 'O Google Sheets recusou a gravação.');
+      return;
+    }
+    if (res && res.success === true) {
+      finishSave(true, res.message || 'Entrega gravada com sucesso!');
+      return;
+    }
+    // Compatibilidade com versões antigas do Apps Script que retornam outro objeto.
+    if (res && (res.ok === true || res.status === 'success')) {
+      finishSave(true, res.message || 'Entrega gravada com sucesso!');
+      return;
+    }
+    finishSave(false, 'O servidor respondeu, mas não confirmou que os dados foram gravados. Confira a planilha antes de repetir.');
   };
 
+  scriptElement.onerror = function() {
+    finishSave(false, 'Falha na comunicação com o Google Apps Script. Nenhuma confirmação de gravação foi recebida.');
+  };
+
+  scriptElement.src = `${API_URL}?${params}`;
   document.body.appendChild(scriptElement);
+}
+
+// Controles dos modais
+function closeModal() {
+  const modal = document.getElementById('modal-entrega');
+  if (modal) modal.classList.add('hidden');
+}
+
+function openTutorial() {
+  const modal = document.getElementById('modal-tutorial');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeTutorial() {
+  const modal = document.getElementById('modal-tutorial');
+  if (modal) modal.classList.add('hidden');
 }
 
 // Função Toast de Notificação
