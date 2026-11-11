@@ -228,7 +228,7 @@ function getPatientRows(sheet) {
     .trim()
     .toLocaleLowerCase('pt-BR')
     .normalize('NFD')
-    .replace(/[\\u0300-\\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '');
 
   const firstCell = normalize(rows[0]?.[0]);
   const headerLabels = [
