@@ -3,7 +3,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbx-EwgEUAXBpaukAR092P-c
 
 // Estado da Aplicação
 let sheetsData = [];
-let currentAbaIndex = 0;
+let currentAbaIndex = 'all';
 let isSyncing = false;
 let lastSyncSnapshot = null;
 let currentEditingPaciente = null;
@@ -174,12 +174,14 @@ function populateAbasSelect() {
     select.appendChild(opt);
   });
   
-  if (savedValue && (savedValue === 'all' || select.options[savedValue])) {
+  // Na primeira abertura, iniciar sempre em "Todas as abas".
+  // Nas sincronizações seguintes, preservar a aba que o usuário escolheu.
+  if (savedValue === 'all' || (savedValue !== '' && select.options[savedValue])) {
     select.value = savedValue;
-    currentAbaIndex = savedValue === 'all' ? 'all' : parseInt(savedValue);
+    currentAbaIndex = savedValue === 'all' ? 'all' : parseInt(savedValue, 10);
   } else {
-    select.value = 0;
-    currentAbaIndex = 0;
+    select.value = 'all';
+    currentAbaIndex = 'all';
   }
 }
 
@@ -216,6 +218,30 @@ function loadColaboradorSalvo() {
   }
 }
 
+// Retorna somente registros válidos, identificando o cabeçalho sem presumir
+// que toda planilha obrigatoriamente tenha títulos na primeira linha.
+function getPatientRows(sheet) {
+  const rows = Array.isArray(sheet?.dados) ? sheet.dados : [];
+  if (!rows.length) return [];
+
+  const normalize = value => String(value ?? '')
+    .trim()
+    .toLocaleLowerCase('pt-BR')
+    .normalize('NFD')
+    .replace(/[\\u0300-\\u036f]/g, '');
+
+  const firstCell = normalize(rows[0]?.[0]);
+  const headerLabels = [
+    'paciente', 'nome', 'nome do paciente', 'paciente/cliente',
+    'beneficiario', 'beneficiario(a)', 'nome completo'
+  ];
+  const startIndex = headerLabels.includes(firstCell) ? 1 : 0;
+
+  return rows.slice(startIndex).filter(row => {
+    return Array.isArray(row) && String(row[0] ?? '').trim() !== '';
+  });
+}
+
 // Atualiza os indicadores conforme a aba/período selecionado.
 // A pesquisa não altera os totais; os números representam todos os registros da seleção.
 function updateDashboardStats() {
@@ -231,20 +257,15 @@ function updateDashboardStats() {
   let entregues = 0;
 
   abasToCount.forEach(sheet => {
-    const rows = sheet.dados || [];
+    const registros = getPatientRows(sheet);
 
-    // A primeira linha contém os títulos das colunas.
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      const paciente = row[0] ? String(row[0]).trim() : '';
-      if (!paciente) continue;
-
+    registros.forEach(row => {
       total++;
-      const dataRetirada = row[4] ? String(row[4]).trim() : '';
-      const assinatura = row[6] ? String(row[6]).trim() : '';
+      const dataRetirada = String(row[4] ?? '').trim();
+      const assinatura = String(row[6] ?? '').trim();
 
       if (dataRetirada || assinatura) entregues++;
-    }
+    });
   });
 
   const totalEl = document.getElementById('stat-total');
@@ -289,17 +310,14 @@ function renderTable() {
   let count = 0;
 
   abasToProcess.forEach(({ sheet, index: abaIdx }) => {
-    const rows = sheet.dados || [];
     const nomeAba = sheet.aba;
+    const registros = getPatientRows(sheet);
 
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      const paciente = row[0] ? String(row[0]).trim() : '';
-      
-      // Pega o exame (Coluna B ou ajustável se estiver em outra coluna)
-      const exame = nomeAba; // Aqui você pode ajustar se quiser pegar de outra coluna específica
-      
-      if (!paciente) continue;
+    registros.forEach(row => {
+      const paciente = String(row[0] ?? '').trim();
+
+      // O nome da aba identifica o exame nesta visualização.
+      const exame = nomeAba;
       
       const dataRetirada = row[4] ? String(row[4]).trim() : '';
       const assinatura = row[6] ? String(row[6]).trim() : '';
@@ -365,7 +383,7 @@ function renderTable() {
           </td>
         </tr>
       `;
-    }
+    });
   });
   
   if (count === 0) {
