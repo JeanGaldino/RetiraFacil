@@ -68,11 +68,13 @@ function syncWithSheets(manual = false) {
 
   const callbackName = 'jsonp_read_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
   const scriptElement = document.createElement('script');
+  scriptElement.async = true;
   let finished = false;
 
+  // Apps Script pode demorar mais na primeira execução ou em planilhas grandes.
   const timeoutId = setTimeout(() => {
-    finishSync(false, null, 'Tempo limite excedido');
-  }, 30000);
+    finishSync(false, null, 'O Google Apps Script demorou para responder. Verifique a implantação e tente novamente.');
+  }, 60000);
 
   function finishSync(success, data, errorMessage) {
     if (finished) return;
@@ -84,15 +86,25 @@ function syncWithSheets(manual = false) {
 
     if (!success) {
       updateSyncStatus('error', errorMessage || 'Falha na conexão');
+      if (manual) showToast(errorMessage || 'Não foi possível conectar à planilha.', 'warning');
       return;
     }
 
-    if (!Array.isArray(data) || data.length === 0) {
-      updateSyncStatus('error', 'Erro nos dados');
+    // O backend retorna um objeto de erro quando não consegue ler a planilha.
+    if (data && !Array.isArray(data) && data.error) {
+      const message = data.message || 'O Apps Script não conseguiu carregar a planilha.';
+      updateSyncStatus('error', message);
+      if (manual) showToast(message, 'warning');
       return;
     }
 
-    // Evita reconstruir toda a tabela se a planilha não mudou.
+    if (!Array.isArray(data)) {
+      const message = 'Resposta inválida do Apps Script. Confira se a versão publicada está atualizada.';
+      updateSyncStatus('error', message);
+      if (manual) showToast(message, 'warning');
+      return;
+    }
+
     const snapshot = JSON.stringify(data);
     if (snapshot !== lastSyncSnapshot) {
       sheetsData = data;
@@ -102,6 +114,7 @@ function syncWithSheets(manual = false) {
     }
 
     updateSyncStatus('success', 'Sincronizado');
+    if (manual) showToast('Dados atualizados com sucesso!', 'success');
   }
 
   window[callbackName] = function(data) {
@@ -109,10 +122,18 @@ function syncWithSheets(manual = false) {
   };
 
   scriptElement.onerror = function() {
-    finishSync(false, null, 'Falha na conexão');
+    finishSync(false, null, 'Falha ao acessar o Web App. Confira se o acesso está liberado e se a URL /exec está correta.');
   };
 
-  scriptElement.src = `${API_URL}?prefix=${callbackName}&t=${Date.now()}`;
+  // Se o navegador carregar uma página, mas o callback JSONP não for executado,
+  // normalmente a implantação não está pública ou a resposta não é JSONP.
+  scriptElement.onload = function() {
+    if (!finished) {
+      finishSync(false, null, 'O Google respondeu, mas não enviou os dados no formato esperado. Publique uma nova versão do Apps Script.');
+    }
+  };
+
+  scriptElement.src = API_URL + '?prefix=' + encodeURIComponent(callbackName) + '&t=' + Date.now();
   document.body.appendChild(scriptElement);
 }
 function updateSyncStatus(status, text) {
