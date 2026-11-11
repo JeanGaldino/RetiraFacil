@@ -216,10 +216,52 @@ function loadColaboradorSalvo() {
   }
 }
 
+// Atualiza os indicadores conforme a aba/período selecionado.
+// A pesquisa não altera os totais; os números representam todos os registros da seleção.
+function updateDashboardStats() {
+  let abasToCount = [];
+
+  if (currentAbaIndex === 'all') {
+    abasToCount = sheetsData;
+  } else if (sheetsData[currentAbaIndex]) {
+    abasToCount = [sheetsData[currentAbaIndex]];
+  }
+
+  let total = 0;
+  let entregues = 0;
+
+  abasToCount.forEach(sheet => {
+    const rows = sheet.dados || [];
+
+    // A primeira linha contém os títulos das colunas.
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const paciente = row[0] ? String(row[0]).trim() : '';
+      if (!paciente) continue;
+
+      total++;
+      const dataRetirada = row[4] ? String(row[4]).trim() : '';
+      const assinatura = row[6] ? String(row[6]).trim() : '';
+
+      if (dataRetirada || assinatura) entregues++;
+    }
+  });
+
+  const totalEl = document.getElementById('stat-total');
+  const deliveredEl = document.getElementById('stat-delivered');
+  const pendingEl = document.getElementById('stat-pending');
+
+  if (totalEl) totalEl.textContent = total.toLocaleString('pt-BR');
+  if (deliveredEl) deliveredEl.textContent = entregues.toLocaleString('pt-BR');
+  if (pendingEl) pendingEl.textContent = (total - entregues).toLocaleString('pt-BR');
+}
+
 // --- RENDERIZAÇÃO DA TABELA ---
 function renderTable() {
   const tbody = document.getElementById('table-body');
   if (!tbody) return;
+
+  updateDashboardStats();
   
   if (!sheetsData || sheetsData.length === 0) {
     tbody.innerHTML = `
