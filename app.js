@@ -5,6 +5,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbw5Y5y0gI5ZOvNGoIWHXJyO
 let sheetsData = [];
 let currentAbaIndex = 0;
 let isSyncing = false;
+let lastSyncSnapshot = null;
 let currentEditingPaciente = null;
 
 // Interceptador Global de Erros para Evitar Alertas Falsos de Redes Cross-Domain
@@ -21,10 +22,16 @@ window.onload = function() {
   loadColaboradorSalvo();
   syncWithSheets();
   
-  // Sincronização Automática Contínua a cada 30 segundos
+  // Sincroniza a cada 30 segundos somente enquanto a página está visível.
+  // Evita consultas desnecessárias quando o sistema fica aberto em segundo plano.
   setInterval(() => {
-    syncWithSheets(false);
+    if (!document.hidden) syncWithSheets(false);
   }, 30000);
+
+  // Ao voltar para a página, atualiza os dados imediatamente.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) syncWithSheets(false);
+  });
 };
 
 // --- MODO ESCURO (DARK MODE) ---
@@ -56,41 +63,58 @@ function updateThemeIcon(isDark) {
 function syncWithSheets(manual = false) {
   if (isSyncing) return;
   isSyncing = true;
-  
-  updateSyncStatus('syncing', manual ? 'Atualizando...' : 'Conectando...');
-  
-  const callbackName = 'jsonp_read_' + Math.round(100000 * Math.random());
-  
-  window[callbackName] = function(data) {
-    delete window[callbackName];
-    if (scriptElement && scriptElement.parentNode) {
-      scriptElement.parentNode.removeChild(scriptElement);
-    }
-    isSyncing = false;
-    
-    if (Array.isArray(data) && data.length > 0) {
-      sheetsData = data;
-      populateAbasSelect();
-      renderTable();
-      updateSyncStatus('success', 'Sincronizado');
-    } else {
-      updateSyncStatus('error', 'Erro nos dados');
-    }
-  };
 
+  updateSyncStatus('syncing', manual ? 'Atualizando...' : 'Sincronizando...');
+
+  const callbackName = 'jsonp_read_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
   const scriptElement = document.createElement('script');
-  scriptElement.src = `${API_URL}?prefix=${callbackName}&t=${Date.now()}`;
-  
-  scriptElement.onerror = function() {
+  let finished = false;
+
+  const timeoutId = setTimeout(() => {
+    finishSync(false, null, 'Tempo limite excedido');
+  }, 30000);
+
+  function finishSync(success, data, errorMessage) {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timeoutId);
     delete window[callbackName];
     if (scriptElement.parentNode) scriptElement.parentNode.removeChild(scriptElement);
     isSyncing = false;
-    updateSyncStatus('error', 'Falha na conexão');
+
+    if (!success) {
+      updateSyncStatus('error', errorMessage || 'Falha na conexão');
+      return;
+    }
+
+    if (!Array.isArray(data) || data.length === 0) {
+      updateSyncStatus('error', 'Erro nos dados');
+      return;
+    }
+
+    // Evita reconstruir toda a tabela se a planilha não mudou.
+    const snapshot = JSON.stringify(data);
+    if (snapshot !== lastSyncSnapshot) {
+      sheetsData = data;
+      lastSyncSnapshot = snapshot;
+      populateAbasSelect();
+      renderTable();
+    }
+
+    updateSyncStatus('success', 'Sincronizado');
+  }
+
+  window[callbackName] = function(data) {
+    finishSync(true, data);
   };
 
+  scriptElement.onerror = function() {
+    finishSync(false, null, 'Falha na conexão');
+  };
+
+  scriptElement.src = `${API_URL}?prefix=${callbackName}&t=${Date.now()}`;
   document.body.appendChild(scriptElement);
 }
-
 function updateSyncStatus(status, text) {
   const badge = document.getElementById('sync-badge');
   const icon = document.getElementById('sync-icon');
