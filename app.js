@@ -343,7 +343,7 @@ function renderTable() {
         const matchQuemRetirou = quemRetirou.toLowerCase().includes(searchTerm);
         const matchExame = exame.toLowerCase().includes(searchTerm);
         const matchAba = nomeAba.toLowerCase().includes(searchTerm);
-        if (!matchPaciente && !matchQuemRetirou && !matchExame && !matchAba) continue;
+        if (!matchPaciente && !matchQuemRetirou && !matchExame && !matchAba) return;
       }
       
       count++;
