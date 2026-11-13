@@ -1233,16 +1233,32 @@ document.getElementById("admin-password-cancel")?.addEventListener("click", fech
 document.getElementById("modal-admin-password")?.addEventListener("click", event => {
   if (event.target.id === "modal-admin-password") fecharModalSenhaAdmin();
 });
-document.getElementById("admin-password-form")?.addEventListener("submit", event => {
+document.getElementById("admin-password-form")?.addEventListener("submit", async event => {
   event.preventDefault();
   const senha = document.getElementById("admin-password-input")?.value;
   const erro = document.getElementById("admin-password-error");
-  if (senha === "Amor@2026") {
+  const button = document.getElementById("admin-password-submit");
+  if (!currentUser || currentUserProfile?.tipo !== "admin") return;
+  button.disabled = true;
+  try {
+    const token = await currentUser.getIdToken();
+    const response = await fetch("/api/admin/verify", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {"Content-Type": "application/json", Authorization: "Bearer " + token},
+      body: JSON.stringify({password: senha})
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Acesso negado.");
     fecharModalSenhaAdmin();
     window.location.href = "panel-adm.html";
-  } else if (erro) {
-    erro.textContent = "Acesso negado";
-    erro.classList.remove("hidden");
+  } catch (error) {
+    if (erro) {
+      erro.textContent = error.message || "Acesso negado";
+      erro.classList.remove("hidden");
+    }
+  } finally {
+    button.disabled = false;
   }
 });
 
