@@ -132,6 +132,15 @@ window.addEventListener("DOMContentLoaded", async () => {
 
 
 // ======================================================
+function exibirSplashLogin() {
+  const el = document.getElementById("login-splash");
+  if (el) { el.classList.remove("hidden"); el.classList.add("flex"); }
+}
+function ocultarSplashLogin() {
+  const el = document.getElementById("login-splash");
+  if (el) { el.classList.add("hidden"); el.classList.remove("flex"); }
+}
+
 // AUTENTICAÇÃO: LOGIN
 // ======================================================
 
@@ -170,6 +179,7 @@ async function realizarLogin(event) {
   }
 
   limparErroLogin();
+  exibirSplashLogin();
 
   try {
     // O Firebase Authentication utiliza e-mail/senha.
@@ -203,6 +213,7 @@ async function realizarLogin(event) {
     }
 
     mostrarErroLogin(mensagem);
+    ocultarSplashLogin();
 
   } finally {
     if (botao) {
@@ -219,6 +230,7 @@ async function realizarLogin(event) {
 // ======================================================
 
 async function validarUsuarioAutenticado(user) {
+  exibirSplashLogin();
   try {
     updateSyncStatus("syncing", "Validando colaborador...");
 
@@ -266,6 +278,7 @@ async function validarUsuarioAutenticado(user) {
     currentUserProfile = perfil;
 
     mostrarAplicacao();
+    ocultarSplashLogin();
     iniciarSincronizacaoExames();
 
   } catch (erro) {
@@ -372,6 +385,7 @@ async function realizarLogout() {
 // ======================================================
 
 function encerrarSessaoVisual() {
+  ocultarSplashLogin();
   fecharModalSenhaAdmin();
   if (typeof unsubscribeExames === "function") {
     unsubscribeExames();
