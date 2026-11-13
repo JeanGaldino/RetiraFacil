@@ -36,6 +36,8 @@ let unsubscribeAvisos = null;
 let avisoAtualId = null;
 let currentDocIdToUpdate = "";
 let currentAbaNomeToUpdate = "";
+let entregaEmAndamento = false;
+const entregasFinalizadasNestaSessao = new Set();
 
 
 // ======================================================
@@ -411,6 +413,7 @@ function encerrarSessaoVisual() {
   currentUser = null;
   currentUserProfile = null;
   sheetsData = [];
+  entregasFinalizadasNestaSessao.clear();
   currentAbaIndex = "all";
   currentEditingPaciente = null;
   currentDocIdToUpdate = "";
@@ -1025,6 +1028,17 @@ function openEntregaModal(
     return;
   }
 
+  if (entregaEmAndamento) return;
+  if (!docId || entregasFinalizadasNestaSessao.has(docId)) {
+    showToast("Este exame já foi processado.", "warning");
+    return;
+  }
+  const registro = sheetsData.flatMap(aba => aba.dados || []).find(row => row[9] === docId);
+  if (!registro || String(registro[4] || "").trim() || String(registro[6] || "").trim()) {
+    showToast("Este exame já foi entregue ou não está disponível.", "warning");
+    return;
+  }
+
   const paciente = decodeURIComponent(pacienteEncoded);
 
   currentEditingPaciente = paciente;
@@ -1075,136 +1089,88 @@ function openEntregaModal(
 // ======================================================
 
 async function confirmarEntregaAction() {
+  if (entregaEmAndamento) return;
   const paciente = currentEditingPaciente;
-
-  const retiradoPorEl =
-    document.getElementById("modal-retirado-por");
-
-  const retiradoPor = retiradoPorEl
-    ? retiradoPorEl.value.trim()
-    : "";
-
-  // O nome vem do perfil autenticado, nunca do campo editável.
-  if (
-    !currentUser ||
-    !currentUserProfile ||
-    currentUserProfile.ativo !== true
-  ) {
-    showToast(
-      "Sua sessão não está autorizada. Entre novamente.",
-      "warning"
-    );
+  const docId = currentDocIdToUpdate;
+  const aba = currentAbaNomeToUpdate || "Exames Geral";
+  const retiradoPor = document.getElementById("modal-retirado-por")?.value.trim() || "";
+  if (!currentUser || !currentUserProfile || currentUserProfile.ativo !== true) {
+    showToast("Sua sessão não está autorizada. Entre novamente.", "warning");
     return;
   }
-
-  const colaborador = currentUserProfile.nome;
-
-  if (!paciente) {
-    showToast(
-      "Não foi possível identificar o paciente.",
-      "warning"
-    );
+  if (!paciente || !docId || !db) {
+    showToast("Não foi possível identificar o exame no Firebase.", "warning");
     return;
   }
-
   if (!retiradoPor) {
-    showToast(
-      "Informe quem está retirando o exame.",
-      "warning"
-    );
+    showToast("Informe quem está retirando o exame.", "warning");
     return;
   }
-
-  if (!db || !currentDocIdToUpdate) {
-    showToast(
-      "Não foi possível identificar o registro no Firebase.",
-      "warning"
-    );
+  if (entregasFinalizadasNestaSessao.has(docId)) {
+    showToast("Este exame já foi entregue.", "warning");
+    closeModal();
     return;
   }
-
-  const now = new Date();
-  const dataHoje = now.toLocaleDateString("pt-BR");
-
-  const horaHoje = now.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-
-  const hash =
-    "#" +
-    Math.random().toString(36).substring(2, 7).toUpperCase();
-
-  const assinaturaFormatada =
-    `${colaborador.toUpperCase()} [ENTREGA DIGITAL: ${dataHoje} ${horaHoje} HASH: ${hash}]`;
-
-  showToast("Gravando entrega no Firebase...", "info");
-
-  // Primeiro grava no Firebase.
+  entregaEmAndamento = true;
+  const botao = document.getElementById("btn-confirmar-entrega");
+  if (botao) {
+    botao.disabled = true;
+    botao.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Salvando...';
+  }
+  const agora = new Date();
+  const dataHoje = agora.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const horaHoje = agora.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+  const hash = "#" + Math.random().toString(36).substring(2, 7).toUpperCase();
+  const assinatura = `${currentUserProfile.nome.toUpperCase()} [ENTREGA DIGITAL: ${dataHoje} ${horaHoje} HASH: ${hash}]`;
+  let gravouFirebase = false;
   try {
-    await db
-      .collection(FIRESTORE_BASE)
-      .doc(FIRESTORE_APP_ID)
-      .collection("public")
-      .doc("data")
-      .collection("exames")
-      .doc(currentDocIdToUpdate)
-      .update({
+    const ref = db.collection(FIRESTORE_BASE).doc(FIRESTORE_APP_ID)
+      .collection("public").doc("data").collection("exames").doc(docId);
+    // A transação consulta o estado do exame antes de gravar.
+    // Impede entregas repetidas, mesmo entre estações diferentes.
+    await db.runTransaction(async transaction => {
+      const snapshot = await transaction.get(ref);
+      if (!snapshot.exists) throw new Error("O exame não foi encontrado.");
+      const dados = snapshot.data() || {};
+      if (dados.dataRetirada || dados.colaborador || dados.entregue === true || dados.retirado === true) {
+        const erro = new Error("Este exame já consta como entregue.");
+        erro.code = "retirafacil/already-delivered";
+        throw erro;
+      }
+      transaction.update(ref, {
         dataRetirada: dataHoje,
-        colaborador: assinaturaFormatada,
+        colaborador: assinatura,
         quemRetirou: retiradoPor
       });
-
-  } catch (erroFirebase) {
-    console.error(
-      "Erro ao atualizar Firebase:",
-      erroFirebase
-    );
-
-    showToast(
-      "Não foi possível salvar no Firebase.",
-      "warning"
-    );
-    return;
-  }
-
-  // Depois envia para a planilha e aguarda confirmação.
-  try {
-    showToast(
-      "Firebase atualizado. Gravando na planilha...",
-      "info"
-    );
-
-    const resultado = await enviarParaPlanilha({
-      aba: currentAbaNomeToUpdate || "Exames Geral",
-      paciente: paciente,
-      dataEntrega: dataHoje,
-      colaborador: assinaturaFormatada,
-      retiradoPor: retiradoPor
     });
-
-    console.log("Confirmação da planilha:", resultado);
-
+    gravouFirebase = true;
+    entregasFinalizadasNestaSessao.add(docId);
     closeModal();
-
-    showToast(
-      "Entrega salva no Firebase e na Planilha!",
-      "success"
-    );
-
-  } catch (erroPlanilha) {
-    console.error(
-      "Firebase foi atualizado, mas a planilha falhou:",
-      erroPlanilha
-    );
-
-    closeModal();
-
-    showToast(
-      "Firebase salvo, mas a planilha não confirmou: " +
-      erroPlanilha.message,
-      "warning"
-    );
+    renderTable();
+    showToast("Retirada registrada! Sincronizando com a planilha...", "info");
+    await enviarParaPlanilha({
+      aba, paciente, dataEntrega: dataHoje,
+      colaborador: assinatura, retiradoPor
+    });
+    showToast("Entrega salva no Firebase e na planilha!", "success");
+  } catch (erro) {
+    console.error("Falha ao confirmar retirada:", erro);
+    if (gravouFirebase) {
+      showToast("Entrega salva no Firebase; a planilha não confirmou: " + erro.message, "warning");
+    } else if (erro.code === "retirafacil/already-delivered") {
+      entregasFinalizadasNestaSessao.add(docId);
+      closeModal();
+      renderTable();
+      showToast("Este exame já foi entregue. Nenhuma nova retirada foi registrada.", "warning");
+    } else {
+      showToast("Não foi possível salvar a retirada: " + erro.message, "warning");
+    }
+  } finally {
+    entregaEmAndamento = false;
+    if (botao) {
+      botao.disabled = false;
+      botao.innerHTML = "Assinar &amp; Confirmar";
+    }
   }
 }
 
@@ -1252,6 +1218,7 @@ document.getElementById("admin-password-form")?.addEventListener("submit", event
 // ======================================================
 
 function closeModal() {
+  if (entregaEmAndamento && !entregasFinalizadasNestaSessao.has(currentDocIdToUpdate)) return;
   const modal = document.getElementById("modal-entrega");
 
   if (modal) modal.classList.add("hidden");

@@ -27,6 +27,9 @@ export default {
       if (url.pathname === "/api/admin/verify" && request.method === "POST") {
         return await verifyAdminPassword(request, env);
       }
+      if (url.pathname === "/api/admin/users" && request.method === "POST") {
+        return await registerUser(request, env);
+      }
       if (url.pathname === "/api/admin/session" && request.method === "GET") {
         return await checkAdminAccess(request, env);
       }
@@ -113,6 +116,98 @@ async function checkAdminAccess(request, env) {
   const storedUid = await env.SESSIONS.get("admin-session:"+ticket);
   if (storedUid !== uid) return json({error:"Confirmação administrativa expirada."}, 403);
   return json({authenticated:true});
+}
+
+
+function firebaseProject(env) { return env.FIREBASE_PROJECT_ID || "retirafacil-75fd6"; }
+async function fetchAdminProfile(request, env) {
+  const uid = await fetchAdminUid(request, env);
+  if (!uid || !env.FIREBASE_ADMIN_SERVICE_ACCOUNT) return null;
+  const token = await getServiceToken(env);
+  const url = "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(firebaseProject(env)) +
+    "/databases/(default)/documents/artifacts/retira-facil-app/public/data/usuarios/" + encodeURIComponent(uid);
+  const response = await fetch(url, {headers:{Authorization:"Bearer "+token}});
+  if (!response.ok) return null;
+  const profile = await response.json();
+  const fields = profile.fields || {};
+  return fields.tipo?.stringValue === "admin" && fields.ativo?.booleanValue === true ? uid : null;
+}
+function base64Url(bytes) {
+  const b64 = btoa(Array.from(bytes).map(x=>String.fromCharCode(x)).join(""));
+  return b64.replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
+}
+async function getServiceToken(env) {
+  const account = JSON.parse(env.FIREBASE_ADMIN_SERVICE_ACCOUNT);
+  if (!account.client_email || !account.private_key) throw new Error("Conta de serviço inválida.");
+  const header = base64Url(new TextEncoder().encode(JSON.stringify({alg:"RS256",typ:"JWT"})));
+  const now = Math.floor(Date.now()/1000);
+  const claim = base64Url(new TextEncoder().encode(JSON.stringify({
+    iss:account.client_email, sub:account.client_email,
+    aud:"https://oauth2.googleapis.com/token",
+    scope:"https://www.googleapis.com/auth/cloud-platform", iat:now, exp:now+3600
+  })));
+  const keyBody = account.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g,"");
+  const keyBytes = Uint8Array.from(atob(keyBody),c=>c.charCodeAt(0));
+  const key = await crypto.subtle.importKey("pkcs8",keyBytes,{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["sign"]);
+  const unsigned = header+"."+claim;
+  const signature = base64Url(new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5",key,new TextEncoder().encode(unsigned))));
+  const response = await fetch("https://oauth2.googleapis.com/token",{
+    method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion:unsigned+"."+signature})
+  });
+  if (!response.ok) throw new Error("Não foi possível autenticar a conta de serviço.");
+  const data = await response.json();
+  return data.access_token;
+}
+async function registerUser(request, env) {
+  if (!isSameOrigin(request)) return json({error:"Origem não autorizada."},403);
+  if (!(request.headers.get("Content-Type")||"").includes("application/json")) return json({error:"Formato inválido."},415);
+  if (!env.FIREBASE_ADMIN_SERVICE_ACCOUNT || !env.FIREBASE_WEB_API_KEY)
+    return json({error:"Configure FIREBASE_ADMIN_SERVICE_ACCOUNT e FIREBASE_WEB_API_KEY no Worker."},503);
+  // Além do token Firebase, consulta o perfil administrativo diretamente no Firestore.
+  const adminUid = await fetchAdminProfile(request,env);
+  if (!adminUid) return json({error:"Somente administradores ativos podem cadastrar usuários."},403);
+  let data;
+  try {data=await request.json();}catch{return json({error:"Dados inválidos."},400);}
+  const nome=typeof data?.nome==="string"?data.nome.trim():"";
+  const usuario=typeof data?.usuario==="string"?data.usuario.trim().toLowerCase():"";
+  const senha=data?.senha;
+  const tipo=data?.tipo;
+  if (!nome || nome.length>100 || !/^[a-z0-9._-]{3,40}$/.test(usuario) ||
+      typeof senha!=="string" || senha.length<8 || senha.length>128 ||
+      !["admin","colaborador"].includes(tipo))
+    return json({error:"Confira nome, usuário, senha e permissão."},400);
+  const accessToken=await getServiceToken(env);
+  const endpoint="https://identitytoolkit.googleapis.com/v1/projects/"+encodeURIComponent(firebaseProject(env))+"/accounts";
+  const email=usuario+"@retirafacil-75fd6.firebaseapp.com";
+  const created=await fetch(endpoint,{method:"POST",headers:{"Authorization":"Bearer "+accessToken,"Content-Type":"application/json"},
+    body:JSON.stringify({email,password:senha,displayName:nome,emailVerified:true,disabled:true})});
+  const createdData=await created.json();
+  if (!created.ok) {
+    const code=createdData.error?.message||"";
+    return json({error:code.includes("EMAIL_EXISTS")?"Este usuário já existe.":"Falha ao criar conta no Firebase Authentication."},created.status===400?409:502);
+  }
+  const uid=createdData.localId;
+  if (!uid) return json({error:"Conta criada sem identificador; confira o Firebase Authentication."},502);
+  const firestoreUrl="https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(firebaseProject(env))+
+    "/databases/(default)/documents/artifacts/retira-facil-app/public/data/usuarios/"+encodeURIComponent(uid);
+  const profile=await fetch(firestoreUrl,{method:"PATCH",headers:{"Authorization":"Bearer "+accessToken,"Content-Type":"application/json"},
+    body:JSON.stringify({fields:{
+      usuario:{stringValue:usuario},nome:{stringValue:nome},tipo:{stringValue:tipo},
+      ativo:{booleanValue:true},criadoPor:{stringValue:adminUid},
+      criadoEm:{timestampValue:new Date().toISOString()}
+    }})});
+  if (!profile.ok) {
+    console.error("Cadastro de perfil falhou:",profile.status,await profile.text());
+    return json({error:"Conta criada desativada, mas o perfil não pôde ser salvo. Verifique as permissões do serviço Firebase."},502);
+  }
+  const enable=await fetch(endpoint+":"+ "update",{method:"POST",headers:{"Authorization":"Bearer "+accessToken,"Content-Type":"application/json"},
+    body:JSON.stringify({localId:uid,disabled:false})});
+  if (!enable.ok) {
+    console.error("Ativação falhou:",enable.status,await enable.text());
+    return json({error:"Conta e perfil criados, mas a ativação falhou. Ative-a manualmente no Firebase Authentication."},502);
+  }
+  return json({success:true,uid,usuario},201);
 }
 
 async function login(request, env) {
