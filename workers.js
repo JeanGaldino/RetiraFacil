@@ -38,17 +38,16 @@ export default {
         return await gerenciarUsuarios(request, env);
       }
 
-      // As rotas de autenticação não exigem sessão.
-      // As demais rotas ainda serão integradas à proteção
-      // dos dados na próxima etapa.
+      // O login atual do RetiraFácil é feito no navegador pelo Firebase Auth.
+      // Os arquivos estáticos precisam estar acessíveis para a tela de login abrir.
+      // Os dados continuam protegidos pelas regras do Firestore e as APIs
+      // administrativas exigem autenticação e autorização no servidor.
       if (!env.ASSETS) {
         return json({ error: "Armazenamento de arquivos não configurado." }, 500);
       }
 
-      const session = await getSession(request, env);
-
-      if (!session) {
-        return json({ error: "Acesso não autorizado." }, 401);
+      if (url.pathname.startsWith("/api/")) {
+        return json({ error: "Rota de API não encontrada." }, 404);
       }
 
       return env.ASSETS.fetch(request);
