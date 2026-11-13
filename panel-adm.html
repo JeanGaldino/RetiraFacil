@@ -36,7 +36,7 @@
   </div>
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getAuth, onAuthStateChanged, signOut, getIdToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
     import { getFirestore, collection, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
     const firebaseConfig = {
@@ -197,6 +197,12 @@
         const perfil = perfilDoc.data();
         if (perfil.ativo !== true) throw new Error('Seu usuário está inativo.');
         if (clean(perfil.tipo).toLowerCase() !== 'admin') throw new Error('Acesso permitido apenas para administradores.');
+        const token = await getIdToken(user);
+        const respostaAdmin = await fetch('/api/admin/session', {
+          method: 'GET', headers: {'Authorization': 'Bearer ' + token},
+          credentials: 'same-origin', cache: 'no-store'
+        });
+        if (!respostaAdmin.ok) throw new Error('Confirme a senha administrativa na página inicial para acessar este painel.');
         $('loading').classList.add('hidden');
         $('panel').classList.remove('hidden');
         iniciarLeitura();

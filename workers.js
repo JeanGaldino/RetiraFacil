@@ -24,6 +24,13 @@ export default {
         return await logout(request, env);
       }
 
+      if (url.pathname === "/api/admin/verify" && request.method === "POST") {
+        return await verifyAdminPassword(request, env);
+      }
+      if (url.pathname === "/api/admin/session" && request.method === "GET") {
+        return await checkAdminAccess(request, env);
+      }
+
       // As rotas de autenticação não exigem sessão.
       // As demais rotas ainda serão integradas à proteção
       // dos dados na próxima etapa.
@@ -48,6 +55,65 @@ export default {
     }
   }
 };
+
+// Senha administrativa armazenada somente no ambiente do Cloudflare Worker.
+const ADMIN_SESSION_DURATION = 10 * 60;
+const ADMIN_COOKIE = "retirafacil_admin";
+
+async function fetchAdminUid(request, env) {
+  if (!env.FIREBASE_WEB_API_KEY) return null;
+  const bearer = request.headers.get("Authorization") || "";
+  if (!bearer.startsWith("Bearer ") || bearer.length > 8192) return null;
+  try {
+    const response = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + encodeURIComponent(env.FIREBASE_WEB_API_KEY), {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({idToken: bearer.slice(7)})
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const user = data.users?.[0];
+    return user && !user.disabled && user.localId ? user.localId : null;
+  } catch (error) {
+    console.error("Erro ao verificar autenticação:", error);
+    return null;
+  }
+}
+async function verifyAdminPassword(request, env) {
+  if (!env.SESSIONS || !env.ADMIN_PASSWORD || !env.FIREBASE_WEB_API_KEY)
+    return json({error:"Verificação administrativa não configurada no servidor."}, 503);
+  if (!isSameOrigin(request)) return json({error:"Origem não autorizada."}, 403);
+  if (!(request.headers.get("Content-Type") || "").includes("application/json"))
+    return json({error:"Formato inválido."}, 415);
+  const uid = await fetchAdminUid(request, env);
+  if (!uid) return json({error:"Sessão do colaborador inválida."}, 401);
+  let body;
+  try { body = await request.json(); } catch { return json({error:"Requisição inválida."}, 400); }
+  const password = body?.password;
+  if (typeof password !== "string" || password.length > 256 || !password.length)
+    return json({error:"Senha inválida."}, 400);
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const rateKey = "admin-attempts:" + ip + ":" + uid;
+  const attempts = Number(await env.SESSIONS.get(rateKey) || 0);
+  if (attempts >= 5) return json({error:"Muitas tentativas. Tente novamente em alguns minutos."}, 429);
+  if (!constantTimeEqual(password, env.ADMIN_PASSWORD)) {
+    await env.SESSIONS.put(rateKey, String(attempts + 1), {expirationTtl:600});
+    return json({error:"Senha administrativa incorreta."}, 401);
+  }
+  await env.SESSIONS.delete(rateKey);
+  const ticket = randomToken();
+  await env.SESSIONS.put("admin-session:"+ticket, uid, {expirationTtl:ADMIN_SESSION_DURATION});
+  return json({success:true}, 200, {"Set-Cookie":ADMIN_COOKIE+"="+ticket+"; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age="+ADMIN_SESSION_DURATION});
+}
+async function checkAdminAccess(request, env) {
+  if (!env.SESSIONS || !env.FIREBASE_WEB_API_KEY) return json({error:"Acesso não configurado."}, 503);
+  const uid = await fetchAdminUid(request, env);
+  if (!uid) return json({error:"Sessão do colaborador inválida."}, 401);
+  const ticket = getCookie(request, ADMIN_COOKIE);
+  if (!ticket || !/^[a-f0-9]{64}$/.test(ticket)) return json({error:"Senha administrativa não confirmada."}, 403);
+  const storedUid = await env.SESSIONS.get("admin-session:"+ticket);
+  if (storedUid !== uid) return json({error:"Confirmação administrativa expirada."}, 403);
+  return json({authenticated:true});
+}
 
 async function login(request, env) {
   if (!env.SESSIONS || !env.ACCESS_PASSWORD) {

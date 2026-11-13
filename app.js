@@ -372,6 +372,7 @@ async function realizarLogout() {
 // ======================================================
 
 function encerrarSessaoVisual() {
+  fecharModalSenhaAdmin();
   if (typeof unsubscribeExames === "function") {
     unsubscribeExames();
     unsubscribeExames = null;
@@ -1182,27 +1183,61 @@ async function confirmarEntregaAction() {
 // ACESSO ADMINISTRATIVO
 // ======================================================
 
-document
-  .getElementById("btn-admin-access")
-  ?.addEventListener("click", () => {
-    if (!currentUser || !currentUserProfile) {
-      showToast("Faça login para continuar.", "warning");
-      return;
-    }
-
-    if (
-      currentUserProfile.tipo !== "admin" ||
-      currentUserProfile.ativo !== true
-    ) {
-      showToast(
-        "Você não possui autorização administrativa.",
-        "warning"
-      );
-      return;
-    }
-
-    window.location.href = "panel-adm.html";
-  });
+function fecharModalSenhaAdmin() {
+  const modal = document.getElementById("modal-admin-password");
+  const senha = document.getElementById("admin-password-input");
+  const erro = document.getElementById("admin-password-error");
+  if (modal) modal.classList.add("hidden");
+  if (senha) senha.value = "";
+  if (erro) { erro.textContent = ""; erro.classList.add("hidden"); }
+}
+document.getElementById("btn-admin-access")?.addEventListener("click", () => {
+  if (!currentUser || !currentUserProfile || currentUserProfile.tipo !== "admin" || currentUserProfile.ativo !== true) {
+    showToast("Você não possui autorização administrativa.", "warning");
+    return;
+  }
+  document.getElementById("modal-admin-password")?.classList.remove("hidden");
+  document.getElementById("admin-password-input")?.focus();
+});
+document.getElementById("admin-password-cancel")?.addEventListener("click", fecharModalSenhaAdmin);
+document.getElementById("modal-admin-password")?.addEventListener("click", event => {
+  if (event.target.id === "modal-admin-password") fecharModalSenhaAdmin();
+});
+document.getElementById("admin-password-form")?.addEventListener("submit", async event => {
+  event.preventDefault();
+  const senhaEl = document.getElementById("admin-password-input");
+  const erroEl = document.getElementById("admin-password-error");
+  const botao = document.getElementById("admin-password-submit");
+  if (!currentUser || !currentUserProfile || currentUserProfile.tipo !== "admin" || currentUserProfile.ativo !== true) {
+    fecharModalSenhaAdmin();
+    showToast("Você não possui autorização administrativa.", "warning");
+    return;
+  }
+  if (!senhaEl || !senhaEl.value || !botao) return;
+  botao.disabled = true;
+  botao.textContent = "Verificando...";
+  if (erroEl) { erroEl.classList.add("hidden"); erroEl.textContent = ""; }
+  try {
+    const idToken = await currentUser.getIdToken();
+    const resposta = await fetch("/api/admin/verify", {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "Authorization": "Bearer " + idToken},
+      credentials: "same-origin", cache: "no-store",
+      body: JSON.stringify({password: senhaEl.value})
+    });
+    const dados = await resposta.json().catch(() => ({}));
+    if (!resposta.ok || dados.success !== true) throw new Error(dados.error || "Não foi possível validar o acesso administrativo.");
+    senhaEl.value = "";
+    window.location.assign("panel-adm.html");
+  } catch (erro) {
+    if (erroEl) { erroEl.textContent = erro.message || "Falha ao verificar a senha."; erroEl.classList.remove("hidden"); }
+    senhaEl.value = "";
+    senhaEl.focus();
+  } finally {
+    botao.disabled = false;
+    botao.textContent = "Acessar painel";
+  }
+});
 
 
 // ======================================================
