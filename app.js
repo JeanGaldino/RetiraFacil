@@ -32,6 +32,8 @@ let auth = null;
 let currentUser = null;
 let currentUserProfile = null;
 let unsubscribeExames = null;
+let unsubscribeAvisos = null;
+let avisoAtualId = null;
 let currentDocIdToUpdate = "";
 let currentAbaNomeToUpdate = "";
 
@@ -280,6 +282,7 @@ async function validarUsuarioAutenticado(user) {
     mostrarAplicacao();
     ocultarSplashLogin();
     iniciarSincronizacaoExames();
+    iniciarEscutaAvisos();
 
   } catch (erro) {
     console.error("Erro ao validar perfil:", erro);
@@ -399,6 +402,12 @@ function encerrarSessaoVisual() {
     unsubscribeExames = null;
   }
 
+  if (typeof unsubscribeAvisos === "function") unsubscribeAvisos();
+  unsubscribeAvisos = null;
+  avisoAtualId = null;
+  const avisoModal = document.getElementById("announcement-alert");
+  avisoModal?.classList.add("hidden");
+  avisoModal?.classList.remove("flex");
   currentUser = null;
   currentUserProfile = null;
   sheetsData = [];
@@ -1301,3 +1310,32 @@ function showToast(message, type = "info") {
     toast.classList.add("hidden");
   }, 3500);
 }
+
+function iniciarEscutaAvisos() {
+  if (!db || !currentUser) return;
+  if (typeof unsubscribeAvisos === "function") unsubscribeAvisos();
+  unsubscribeAvisos = db.collection("artifacts").doc("retira-facil-app")
+    .collection("public").doc("data").collection("avisos").doc("atual")
+    .onSnapshot(snapshot => {
+      if (!snapshot.exists || !currentUser) return;
+      const aviso = snapshot.data();
+      if (!aviso || !aviso.id || typeof aviso.mensagem !== "string") return;
+      const chave = "retirafacil_aviso_lido_" + currentUser.uid;
+      try { if (localStorage.getItem(chave) === aviso.id) return; } catch (_) {}
+      avisoAtualId = aviso.id;
+      const modal = document.getElementById("announcement-alert");
+      const mensagem = document.getElementById("announcement-alert-message");
+      if (!modal || !mensagem) return;
+      mensagem.textContent = aviso.mensagem;
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }, error => console.error("Falha ao receber aviso:", error));
+}
+document.getElementById("announcement-alert-confirm")?.addEventListener("click", () => {
+  if (currentUser && avisoAtualId) {
+    try { localStorage.setItem("retirafacil_aviso_lido_" + currentUser.uid, avisoAtualId); } catch (_) {}
+  }
+  const modal = document.getElementById("announcement-alert");
+  modal?.classList.add("hidden");
+  modal?.classList.remove("flex");
+});
