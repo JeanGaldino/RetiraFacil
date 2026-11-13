@@ -31,6 +31,13 @@ export default {
         return await checkAdminAccess(request, env);
       }
 
+      if (url.pathname === "/api/admin/users" && ["GET", "POST"].includes(request.method)) {
+        return await gerenciarUsuarios(request, env);
+      }
+      if (/^\/api\/admin\/users\/[^/]+$/.test(url.pathname) && request.method === "PATCH") {
+        return await gerenciarUsuarios(request, env);
+      }
+
       // As rotas de autenticação não exigem sessão.
       // As demais rotas ainda serão integradas à proteção
       // dos dados na próxima etapa.
@@ -113,6 +120,174 @@ async function checkAdminAccess(request, env) {
   const storedUid = await env.SESSIONS.get("admin-session:"+ticket);
   if (storedUid !== uid) return json({error:"Confirmação administrativa expirada."}, 403);
   return json({authenticated:true});
+}
+
+
+// Operações privilegiadas usam Firebase Admin via OAuth de conta de serviço.
+// Configure FIREBASE_SERVICE_ACCOUNT_JSON como segredo no Worker.
+function contaServico(env) {
+  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON não configurado.');
+  const service = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  if (!service.client_email || !service.private_key || service.project_id !== 'retirafacil-75fd6') throw new Error('Credenciais Firebase inválidas.');
+  return service;
+}
+function codificarBase64Url(value) {
+  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
+  let str = '';
+  for (const byte of bytes) str += String.fromCharCode(byte);
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+async function accessTokenFirebase(env) {
+  const service = contaServico(env);
+  const now = Math.floor(Date.now() / 1000);
+  const header = codificarBase64Url(JSON.stringify({alg:'RS256',typ:'JWT'}));
+  const claims = codificarBase64Url(JSON.stringify({
+    iss:service.client_email, sub:service.client_email,
+    aud:'https://oauth2.googleapis.com/token',
+    scope:'https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/datastore',
+    iat:now, exp:now + 3600
+  }));
+  const bytes = new TextEncoder().encode(header + '.' + claims);
+  const pem = service.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  const binary = atob(pem);
+  const der = Uint8Array.from(binary, c => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey('pkcs8', der, {name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'}, false, ['sign']);
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, bytes);
+  const assertion = header + '.' + claims + '.' + codificarBase64Url(new Uint8Array(signature));
+  const res = await fetch('https://oauth2.googleapis.com/token', {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion})});
+  const data = await res.json();
+  if (!res.ok || !data.access_token) throw new Error('Falha na autenticação da conta de serviço.');
+  return data.access_token;
+}
+const FIRESTORE_USERS = 'projects/retirafacil-75fd6/databases/(default)/documents/artifacts/retira-facil-app/public/data/usuarios';
+async function firebaseRequest(url, token, options = {}) {
+  const res = await fetch(url, {...options,headers:{Authorization:'Bearer '+token,...(options.headers || {})}});
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    console.error('Firebase Admin API:',res.status,JSON.stringify(data).slice(0,500));
+    const error = new Error(data.error?.message || 'Falha na operação Firebase.');
+    error.status = res.status;
+    throw error;
+  }
+  return data;
+}
+function valor(field) { return field?.stringValue ?? field?.booleanValue ?? ''; }
+function firestorePerfil(doc) {
+  return {
+    uid:doc.name?.split('/').pop(),
+    nome:valor(doc.fields?.nome),
+    usuario:valor(doc.fields?.usuario),
+    tipo:valor(doc.fields?.tipo),
+    ativo:valor(doc.fields?.ativo) === true
+  };
+}
+function fieldString(v) {return {stringValue:String(v)}}
+async function perfilPorUid(uid, token) {
+  try {
+    const doc = await firebaseRequest('https://firestore.googleapis.com/v1/'+FIRESTORE_USERS+'/'+encodeURIComponent(uid),token);
+    return firestorePerfil(doc);
+  } catch(e) {
+    if(e.status===404)return null;
+    throw e;
+  }
+}
+async function authorizeUserManager(request,env) {
+  const uid=await fetchAdminUid(request,env);
+  if(!uid) return {error:json({error:'Sua sessão expirou. Faça login novamente.'},401)};
+  const token=await accessTokenFirebase(env);
+  const perfil=await perfilPorUid(uid,token);
+  if(!perfil || !perfil.ativo || perfil.tipo!=='admin')return {error:json({error:'Acesso permitido somente a administradores ativos.'},403)};
+  // Confirma a senha adicional por ticket de curta duração do Worker.
+  const ticket=getCookie(request,ADMIN_COOKIE);
+  if(!ticket || !/^[a-f0-9]{64}$/.test(ticket) || !env.SESSIONS || await env.SESSIONS.get('admin-session:'+ticket)!==uid)
+    return {error:json({error:'Confirme novamente a senha administrativa antes de gerenciar usuários.'},403)};
+  return {uid,token};
+}
+async function listarUsuarios(token) {
+  const result=[];
+  let pageToken='';
+  do {
+    const url='https://firestore.googleapis.com/v1/'+FIRESTORE_USERS+'?pageSize=200'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');
+    const data=await firebaseRequest(url,token);
+    result.push(...(data.documents || []).map(firestorePerfil));
+    pageToken=data.nextPageToken || '';
+  } while(pageToken && result.length<2000);
+  return result;
+}
+async function gerenciarUsuarios(request,env) {
+  if (!env.FIREBASE_WEB_API_KEY || !env.SESSIONS || !env.ADMIN_PASSWORD || !env.FIREBASE_SERVICE_ACCOUNT_JSON)
+    return json({error:'Gerenciamento de usuários não configurado no Cloudflare.'},503);
+  if(request.method!=='GET' && !isSameOrigin(request))return json({error:'Origem não autorizada.'},403);
+  let access;
+  try {access=await authorizeUserManager(request,env)} catch(error) {
+    console.error('Erro ao autorizar administrador:',error);
+    return json({error:'Erro na configuração ou autorização do Firebase.'},503);
+  }
+  if(access.error)return access.error;
+  const {uid:adminUid,token}=access;
+  try {
+    if(request.method==='GET') {
+      const users=await listarUsuarios(token);
+      return json({users:users.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))});
+    }
+    if(!(request.headers.get('Content-Type') || '').includes('application/json'))
+      return json({error:'Formato inválido.'},415);
+    const body=await request.json().catch(()=>null);
+    if(!body || typeof body!=='object')return json({error:'Dados inválidos.'},400);
+    if(request.method==='PATCH') {
+      const uid=decodeURIComponent(new URL(request.url).pathname.split('/').pop());
+      if(!/^[a-zA-Z0-9]{10,128}$/.test(uid))return json({error:'Identificador inválido.'},400);
+      if(typeof body.ativo!=='boolean')return json({error:'Status inválido.'},400);
+      if(uid===adminUid && body.ativo===false)return json({error:'Não é permitido desativar a própria conta.'},400);
+      const current=await perfilPorUid(uid,token);
+      if(!current)return json({error:'Usuário não encontrado.'},404);
+      const patch={fields:{ativo:{booleanValue:body.ativo}}};
+      await firebaseRequest('https://firestore.googleapis.com/v1/'+FIRESTORE_USERS+'/'+uid+'?updateMask.fieldPaths=ativo',token,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+      // Também bloqueia o login de uma conta inativa no Firebase Authentication.
+      await firebaseRequest('https://identitytoolkit.googleapis.com/v1/projects/retirafacil-75fd6/accounts:update',token,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({localId:uid,disable:!body.ativo})});
+      return json({success:true});
+    }
+    const nome=typeof body.nome==='string'?body.nome.trim():'';
+    const usuario=typeof body.usuario==='string'?body.usuario.trim().toLowerCase():'';
+    const senha=body.senha;
+    const tipo=body.tipo;
+    if(nome.length<3 || nome.length>100 || !/^[a-z0-9._-]{3,40}$/.test(usuario) ||
+       typeof senha!=='string' || senha.length<8 || senha.length>128 || !['admin','colaborador'].includes(tipo))
+      return json({error:'Informe nome, usuário válido, senha de no mínimo 8 caracteres e permissão.'},400);
+    const email=usuario+'@retirafacil-75fd6.firebaseapp.com';
+    let created;
+    try {
+      created=await firebaseRequest('https://identitytoolkit.googleapis.com/v1/projects/retirafacil-75fd6/accounts',token,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email,password:senha,emailVerified:true,disabled:false,displayName:nome})
+      });
+    } catch(e) {
+      if(e.status===400 && /EMAIL_EXISTS|EMAIL_ALREADY_EXISTS/.test(e.message))
+        return json({error:'Este nome de usuário já existe.'},409);
+      throw e;
+    }
+    const newUid=created.localId || created.uid;
+    if(!newUid)throw new Error('Firebase não retornou o identificador do novo usuário.');
+    try {
+      await firebaseRequest('https://firestore.googleapis.com/v1/'+FIRESTORE_USERS+'/'+encodeURIComponent(newUid),token,{
+        method:'PATCH',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({fields:{
+          nome:fieldString(nome),usuario:fieldString(usuario),tipo:fieldString(tipo),
+          ativo:{booleanValue:true},criadoPor:fieldString(adminUid),
+          criadoEm:{timestampValue:new Date().toISOString()}
+        }})
+      });
+    } catch(e) {
+      // Conta sem perfil não pode acessar o sistema; tenta desfazer sua criação.
+      try {await firebaseRequest('https://identitytoolkit.googleapis.com/v1/projects/retirafacil-75fd6/accounts:delete',token,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({localId:newUid})})} catch(rollbackError) {console.error('Falha no rollback de cadastro:',rollbackError)}
+      throw e;
+    }
+    return json({success:true,uid:newUid},201);
+  } catch(error) {
+    console.error('Erro no gerenciamento de usuários:',error);
+    if(error.status===403)return json({error:'A conta de serviço não tem permissão para gerenciar os usuários.'},503);
+    return json({error:'Não foi possível realizar a operação. Verifique a configuração Firebase.'},500);
+  }
 }
 
 async function login(request, env) {

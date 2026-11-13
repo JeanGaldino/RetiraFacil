@@ -32,6 +32,17 @@
         <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl shadow-sm overflow-hidden"><div class="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3"><h2 class="font-bold text-lg">Auditoria de retiradas <span class="block text-xs font-normal text-slate-500">Somente hoje • horário de Brasília</span></h2><input id="audit-search" type="search" placeholder="Buscar paciente ou colaborador" class="w-full sm:w-72 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm"></div><div class="overflow-x-auto"><table class="min-w-full text-sm"><thead class="bg-slate-50 dark:bg-slate-800 text-left"><tr><th class="p-4">Paciente</th><th class="p-4">Exame</th><th class="p-4">Colaborador</th><th class="p-4">Retirado por</th><th class="p-4">Data da retirada</th></tr></thead><tbody id="audit-table-body"><tr><td colspan="5" class="p-5 text-center text-slate-500">Carregando...</td></tr></tbody></table></div></div>
         <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm"><h2 class="p-6 border-b border-slate-200 dark:border-slate-800 font-bold text-lg">Ranking de colaboradores <span class="block text-xs font-normal text-slate-500">Entregas realizadas hoje</span></h2><div id="collab-ranking-list" class="p-6 space-y-3"><p class="text-slate-500">Carregando...</p></div></div>
       </section>
+      <section class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm" aria-labelledby="users-title">
+        <div class="flex flex-wrap justify-between gap-3 items-center mb-5"><div><h2 id="users-title" class="text-lg font-bold">Gerenciamento de usuários</h2><p class="text-sm text-slate-500">Cadastre colaboradores e controle quem pode acessar o RetiraFácil.</p></div><button id="refresh-users" type="button" class="rounded-xl border border-cyan-600 text-cyan-700 dark:text-cyan-400 px-4 py-2 font-semibold"><i class="fa-solid fa-rotate mr-2"></i>Atualizar usuários</button></div>
+        <form id="user-form" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-end">
+          <div><label for="new-name" class="block text-sm font-semibold mb-1">Nome completo</label><input id="new-name" required maxlength="100" autocomplete="off" placeholder="Ex.: Isadora Assis" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent p-3"></div>
+          <div><label for="new-username" class="block text-sm font-semibold mb-1">Usuário</label><input id="new-username" required pattern="[a-z0-9._-]+" maxlength="40" autocomplete="off" placeholder="Ex.: isadora.assis" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent p-3"><p class="text-xs text-slate-500 mt-1">Letras minúsculas, números, ponto, hífen ou _</p></div>
+          <div><label for="new-password" class="block text-sm font-semibold mb-1">Senha inicial</label><input id="new-password" type="password" required minlength="8" maxlength="128" autocomplete="new-password" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent p-3"></div>
+          <div><label for="new-role" class="block text-sm font-semibold mb-1">Permissão</label><select id="new-role" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3"><option value="colaborador">Colaborador</option><option value="admin">Administrador</option></select></div>
+          <div class="sm:col-span-2 xl:col-span-4 flex flex-wrap items-center gap-3"><button id="create-user" type="submit" class="rounded-xl px-5 py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-bold"><i class="fa-solid fa-user-plus mr-2"></i>Cadastrar usuário</button><p id="user-feedback" class="text-sm" role="status" aria-live="polite"></p></div>
+        </form>
+        <div class="overflow-x-auto mt-6"><table class="min-w-full text-sm"><thead class="bg-slate-50 dark:bg-slate-800 text-left"><tr><th class="p-3">Nome</th><th class="p-3">Usuário</th><th class="p-3">Perfil</th><th class="p-3">Status</th><th class="p-3">Ação</th></tr></thead><tbody id="users-table-body"><tr><td colspan="5" class="p-4 text-center text-slate-500">Carregando usuários...</td></tr></tbody></table></div>
+      </section>
       <p id="data-status" class="text-xs text-slate-500 text-center" role="status"></p>
     </main>
   </div>
@@ -64,6 +75,8 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
     let unsubscribeExames = null;
+    let administradorUid = null;
+    let usuarios = [];
     let exames = [];
     const $ = id => document.getElementById(id);
     const clean = value => String(value ?? '').trim();
@@ -217,6 +230,89 @@
         enviar.disabled = false;
       }
     });
+    // A criação de contas é executada no Worker, nunca diretamente no navegador.
+    async function chamarUsuarios(method, path, body) {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('Sua sessão expirou. Faça login novamente.');
+      const response = await fetch('/api/admin/users' + path, {
+        method,
+        credentials: 'same-origin',
+        headers: {'Authorization': 'Bearer ' + token, ...(body ? {'Content-Type': 'application/json'} : {})},
+        ...(body ? {body: JSON.stringify(body)} : {})
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Não foi possível concluir a operação.');
+      return data;
+    }
+    function feedbackUsuario(mensagem, erro = false) {
+      $('user-feedback').textContent = mensagem;
+      $('user-feedback').className = 'text-sm ' + (erro ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400');
+    }
+    function renderUsuarios() {
+      const corpo = $('users-table-body');
+      if (!usuarios.length) {
+        corpo.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-500">Nenhum usuário cadastrado.</td></tr>';
+        return;
+      }
+      corpo.innerHTML = usuarios.map(u => `<tr class="border-t border-slate-100 dark:border-slate-800">
+        <td class="p-3 font-medium">${escapeHTML(u.nome)}</td><td class="p-3">${escapeHTML(u.usuario)}</td>
+        <td class="p-3">${u.tipo === 'admin' ? 'Administrador' : 'Colaborador'}</td>
+        <td class="p-3">${u.ativo ? 'Ativo' : 'Inativo'}</td>
+        <td class="p-3"><button type="button" data-user-id="${escapeHTML(u.uid)}" data-next-active="${!u.ativo}" ${u.uid === administradorUid ? 'disabled title="Você não pode desativar sua própria conta"' : ''} class="toggle-user rounded-lg px-3 py-2 font-semibold text-white ${u.ativo ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'} disabled:opacity-40">${u.ativo ? 'Desativar' : 'Ativar'}</button></td>
+      </tr>`).join('');
+    }
+    async function carregarUsuarios() {
+      $('refresh-users').disabled = true;
+      try {
+        const data = await chamarUsuarios('GET', '');
+        usuarios = data.users || [];
+        renderUsuarios();
+      } catch (erro) {
+        feedbackUsuario(erro.message, true);
+        $('users-table-body').innerHTML = '<tr><td colspan="5" class="p-4 text-center text-rose-600">Erro ao consultar usuários.</td></tr>';
+      } finally {
+        $('refresh-users').disabled = false;
+      }
+    }
+    $('refresh-users').addEventListener('click', carregarUsuarios);
+    $('user-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = $('create-user');
+      const nome = clean($('new-name').value);
+      const usuario = clean($('new-username').value).toLowerCase();
+      const senha = $('new-password').value;
+      const tipo = $('new-role').value;
+      button.disabled = true;
+      feedbackUsuario('Cadastrando usuário...');
+      try {
+        if (tipo === 'admin' && !confirm('Conceder acesso administrativo a este novo usuário?')) return;
+        await chamarUsuarios('POST', '', {nome, usuario, senha, tipo});
+        $('user-form').reset();
+        feedbackUsuario('Usuário cadastrado com sucesso.');
+        await carregarUsuarios();
+      } catch (erro) {
+        feedbackUsuario(erro.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+    $('users-table-body').addEventListener('click', async event => {
+      const btn = event.target.closest('button.toggle-user');
+      if (!btn || btn.disabled) return;
+      const uid = btn.dataset.userId;
+      const ativo = btn.dataset.nextActive === 'true';
+      if (!confirm(`${ativo ? 'Ativar' : 'Desativar'} este usuário?`)) return;
+      btn.disabled = true;
+      try {
+        await chamarUsuarios('PATCH', '/' + encodeURIComponent(uid), {ativo});
+        feedbackUsuario('Status atualizado com sucesso.');
+        await carregarUsuarios();
+      } catch (erro) {
+        feedbackUsuario(erro.message, true);
+        btn.disabled = false;
+      }
+    });
+
     iniciarTimer();
     // Atualiza também na virada do dia, mesmo sem novos eventos do Firestore.
     let ultimoDiaExibido = diaBrasilia();
@@ -238,7 +334,9 @@
         if (clean(perfil.tipo).toLowerCase() !== 'admin') throw new Error('Acesso permitido apenas para administradores.');
         $('loading').classList.add('hidden');
         $('panel').classList.remove('hidden');
+        administradorUid = user.uid;
         iniciarLeitura();
+        await carregarUsuarios();
       } catch(error) {
         console.error('Falha na validação administrativa:', error);
         mostrarErro(error.message || 'Não foi possível validar sua permissão.');
