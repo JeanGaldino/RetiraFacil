@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RetiraFácil</title>
-  
+
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="style/logo.png">  
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%2345b7c9'/><rect x='25' y='30' width='50' height='50' rx='10' fill='none' stroke='white' stroke-width='6'/><circle cx='50' cy='28' r='12' fill='%2345b7c9' stroke='white' stroke-width='4'/><path d='M50 22 C47 18 41 20 41 24 C41 28 50 33 50 33 C50 33 59 28 59 24 C59 20 53 18 50 22 Z' fill='%23e53e3e'/><circle cx='40' cy='50' r='4' fill='white'/><circle cx='60' cy='50' r='4' fill='white'/><path d='M40 60 Q50 68 60 60' fill='none' stroke='white' stroke-width='4' stroke-linecap='round'/></svg>">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -14,33 +15,92 @@
       darkMode: 'class'
     }
   </script>
-  
+
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
+
   <!-- Estilos Customizados Separados -->
   <link rel="stylesheet" href="style/style.css">
 </head>
+
 <body class="bg-slate-50 font-sans text-slate-800 min-h-screen flex flex-col">
 
-  <!-- TELA DE MANUTENÇÃO: bloqueia o acesso ao sistema durante os ajustes -->
-  <main id="maintenance-screen" class="fixed inset-0 z-[9999] min-h-screen w-full flex items-center justify-center bg-slate-950 px-6 py-10 text-center">
-    <section class="w-full max-w-xl rounded-3xl border border-slate-700 bg-slate-900 p-8 shadow-2xl sm:p-12">
-      <div class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400">
-        <i class="fas fa-tools text-4xl" aria-hidden="true"></i>
+  <!-- TELA DE LOGIN -->
+  <section id="login-screen" class="min-h-screen flex items-center justify-center p-5 bg-slate-50 dark:bg-slate-950">
+    <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 p-8">
+
+      <div class="flex flex-col items-center text-center mb-8">
+        <div class="w-20 h-20 rounded-full bg-[#45b7c9] flex items-center justify-center shadow-lg mb-4">
+          <i class="fas fa-file-medical text-white text-3xl"></i>
+        </div>
+
+        <h1 class="text-2xl font-bold text-slate-800 dark:text-white">
+          RetiraFácil
+        </h1>
+
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          AmorSaúde de Americana
+        </p>
+
+        <p class="text-xs text-slate-400 mt-4">
+          Entre com suas credenciais para acessar o sistema.
+        </p>
       </div>
-      <p class="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-cyan-400">RetiraFácil · AmorSaúde</p>
-      <h1 class="mb-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">Sistema em manutenção</h1>
-      <p class="mx-auto max-w-md text-base leading-relaxed text-slate-300">
-        Estamos realizando ajustes e melhorias no RetiraFácil para garantir o funcionamento correto do sistema.
+
+      <form id="login-form" class="space-y-5">
+        <div>
+          <label for="login-usuario" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-2">
+            Nome de usuário
+          </label>
+
+          <div class="relative">
+            <i class="fas fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input
+              type="text"
+              id="login-usuario"
+              autocomplete="username"
+              placeholder="Digite seu usuário"
+              required
+              class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#45b7c9]"
+            >
+          </div>
+        </div>
+
+        <div>
+          <label for="login-senha" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-2">
+            Senha
+          </label>
+
+          <div class="relative">
+            <i class="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input
+              type="password"
+              id="login-senha"
+              autocomplete="current-password"
+              placeholder="Digite sua senha"
+              required
+              class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#45b7c9]"
+            >
+          </div>
+        </div>
+
+        <p id="login-error" class="hidden text-sm text-red-500 text-center"></p>
+
+        <button
+          type="submit"
+          id="login-button"
+          class="w-full py-3 bg-[#45b7c9] hover:bg-[#3ba4b5] text-white font-bold rounded-xl transition shadow-md shadow-[#45b7c9]/20"
+        >
+          <i class="fas fa-sign-in-alt mr-2"></i>
+          Entrar no sistema
+        </button>
+      </form>
+
+      <p class="text-center text-xs text-slate-400 mt-7">
+        Acesso exclusivo aos colaboradores autorizados.
       </p>
-      <div class="mt-8 inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-sm font-medium text-amber-300">
-        <i class="fas fa-clock" aria-hidden="true"></i>
-        <span>Acesso temporariamente indisponível</span>
-      </div>
-      <p class="mt-8 text-xs text-slate-500">Por favor, aguarde a conclusão da manutenção antes de utilizar o sistema.</p>
-    </section>
-  </main>
+    </div>
+  </section>
 
   <!-- NOTIFICAÇÃO DE STATUS TOAST -->
   <div id="toast" class="toast-notification hidden fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-xl text-white transition-all duration-300">
@@ -48,240 +108,263 @@
     <span id="toast-message" class="font-medium text-sm"></span>
   </div>
 
-  <!-- CABEÇALHO SUPERIOR -->
-  <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 shadow-sm transition-colors duration-200">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
-      
-      <!-- LOGO + MARCA -->
-<div class="flex items-center gap-3">
-    <!-- Adicionado 'overflow-hidden' no container principal -->
-    <div class="w-11 h-11 rounded-full bg-[#45b7c9] flex items-center justify-center shadow-md overflow-hidden flex-shrink-0">
-      <img src="style/logo.png" alt="Avatar" class="w-full h-full object-cover">
-    </div>
-    <div>
-        </div>
-        <div>
-          <h1 class="text-xl font-bold text-slate-800 dark:text-white tracking-tight leading-none flex items-center gap-2">
-            RetiraFácil <span class="text-xs bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded-full">AmorSaúde</span>
-          </h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Gestão Inteligente de Entrega de Exames</p>
-        </div>
-      </div>
+  <!-- CONTEÚDO PROTEGIDO DO SISTEMA -->
+  <div id="app-content" class="hidden flex-col flex-grow">
 
-      <!-- STATUS, MODO ESCURO, TUTORIAL E REFRESH -->
-      <div class="flex items-center gap-2 md:gap-3">
-        <div id="sync-badge" class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700">
-          <i id="sync-icon" class="fas fa-sync-alt text-slate-400"></i>
-          <span id="sync-text">Conectando...</span>
-        </div>
+    <!-- CABEÇALHO SUPERIOR -->
+    <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 shadow-sm transition-colors duration-200">
+      <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
 
-        <!-- Botão Guia/Tutorial -->
-        <button onclick="openTutorial()" class="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs transition flex items-center gap-1.5 font-medium" title="Como usar">
-          <i class="fas fa-question-circle text-[#45b7c9]"></i>
-          <span class="hidden sm:inline">Guia</span>
-        </button>
-
-        <!-- Alternador Modo Escuro -->
-        <button id="btn-theme-toggle" onclick="toggleTheme()" class="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs transition" title="Alternar tema">
-          <i id="theme-toggle-icon" class="fas fa-moon"></i>
-        </button>
-
-        <button id="btn-force-reload" onclick="syncWithSheets(true)" class="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs transition" title="Atualizar agora">
-          <i class="fas fa-redo-alt"></i>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- CONTEÚDO PRINCIPAL -->
-  <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full">
-    
-    <!-- PAINEL DE INDICADORES -->
-    <section class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5" aria-label="Resumo das entregas">
-      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex items-center gap-4 transition-colors">
-        <div class="w-11 h-11 rounded-xl bg-sky-100 dark:bg-sky-950/70 text-sky-600 dark:text-sky-300 flex items-center justify-center text-lg flex-shrink-0">
-          <i class="fas fa-flask"></i>
-        </div>
-        <div class="min-w-0">
-          <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Total de exames</p>
-          <p id="stat-total" class="text-2xl font-bold text-slate-800 dark:text-white tabular-nums">0</p>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex items-center gap-4 transition-colors">
-        <div class="w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-300 flex items-center justify-center text-lg flex-shrink-0">
-          <i class="fas fa-check-circle"></i>
-        </div>
-        <div class="min-w-0">
-          <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Exames entregues</p>
-          <p id="stat-delivered" class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">0</p>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex items-center gap-4 transition-colors">
-        <div class="w-11 h-11 rounded-xl bg-amber-100 dark:bg-amber-950/70 text-amber-600 dark:text-amber-300 flex items-center justify-center text-lg flex-shrink-0">
-          <i class="fas fa-clock"></i>
-        </div>
-        <div class="min-w-0">
-          <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Aguardando entrega</p>
-          <p id="stat-pending" class="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">0</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- BARRA DE CONTROLES: PESQUISA E SELEÇÃO DE ABA -->
-    <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 mb-6 flex flex-col md:flex-row items-center justify-between gap-4 transition-colors">
-      
-      <!-- BUSCA DE PACIENTE -->
-      <div class="relative w-full md:w-96">
-        <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-        <input 
-          type="text" 
-          id="search-input" 
-          placeholder="Buscar por paciente ou responsável..."
-          class="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#45b7c9] transition"
-          oninput="handleSearch()"
-        >
-        <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-          <i class="fas fa-times-circle"></i>
-        </button>
-      </div>
-
-      <!-- SELECT DE ABAS / MESES -->
-      <div class="flex items-center gap-2 w-full md:w-auto">
-        <label for="aba-select" class="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">Aba / Período:</label>
-        <select 
-          id="aba-select" 
-          onchange="changeAba()" 
-          class="w-full md:w-auto bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-medium text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#45b7c9] transition"
-        >
-          <option value="">Carregando abas...</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- TABELA DE RESULTADOS -->
-    <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
-              <th class="py-3.5 px-4">Paciente</th>
-              <th class="py-3.5 px-4">Exame / Detalhes</th>
-              <th class="py-3.5 px-4">Data Retirada</th>
-              <th class="py-3.5 px-4">Assinatura Eletrônica</th>
-              <th class="py-3.5 px-4">Quem Retirou</th>
-              <th class="py-3.5 px-4 text-center">Ações</th>
-            </tr>
-          </thead>
-          <tbody id="table-body" class="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
-            <tr>
-              <td colspan="6" class="py-12 text-center text-slate-400">
-                <i class="fas fa-spinner fa-spin text-2xl mb-2 text-[#45b7c9]"></i>
-                <p>Carregando dados da planilha...</p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </main>
-
-  <!-- MODAL DE CONFIRMAÇÃO E ASSINATURA ELETRÔNICA -->
-  <div id="modal-entrega" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-    <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-md overflow-hidden transform transition-all">
-      <div class="bg-slate-50 dark:bg-slate-800/80 px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-        <h3 class="font-bold text-slate-800 dark:text-white text-base flex items-center gap-2">
-          <i class="fas fa-file-signature text-[#45b7c9]"></i> Confirmar Entrega Digital
-        </h3>
-        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-      
-      <div class="p-6 space-y-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">Paciente</label>
-          <input type="text" id="modal-paciente" readonly class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold px-3 py-2 rounded-xl text-sm focus:outline-none">
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Quem está retirando? *</label>
-          <input type="text" id="modal-retirado-por" placeholder="Ex: O próprio paciente / Maria (Mãe)" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-white px-3 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-[#45b7c9] focus:outline-none">
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Seu Nome (Colaborador) *</label>
-          <input type="text" id="modal-colaborador" placeholder="Ex: Jean / Isabela" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-white px-3 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-[#45b7c9] focus:outline-none">
-        </div>
-
-        <!-- PAINEL DE ASSINATURA ELETRÔNICA (PREVIEW DO HASH) -->
-        <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs text-slate-500 dark:text-slate-400 space-y-1">
-          <div class="flex items-center justify-between">
-            <span class="font-medium text-slate-600 dark:text-slate-300"><i class="fas fa-shield-alt text-emerald-500 mr-1"></i> Carimbo Digital:</span>
-            <span id="preview-hash" class="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">#GERANDO</span>
+        <!-- LOGO + MARCA -->
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-full bg-[#45b7c9] flex items-center justify-center shadow-md overflow-hidden p-0 flex-shrink-0 border-2 border-white dark:border-slate-800">
+            <svg class="w-full h-full text-white scale-110 transform translate-y-0.5" viewBox="0 0 100 100" fill="none">
+              <rect x="20" y="28" width="60" height="58" rx="14" stroke="currentColor" stroke-width="7" fill="none"/>
+              <circle cx="50" cy="26" r="14" fill="#45b7c9" stroke="currentColor" stroke-width="5"/>
+              <path d="M50 20 C46 15 38 18 38 23 C38 28 50 34 50 34 C50 34 62 28 62 23 C62 18 54 15 50 20 Z" fill="#e53e3e"/>
+              <circle cx="38" cy="50" r="4.5" fill="currentColor"/>
+              <circle cx="62" cy="50" r="4.5" fill="currentColor"/>
+              <path d="M38 62 Q50 72 62 62" stroke="currentColor" stroke-width="5" stroke-linecap="round" fill="none"/>
+            </svg>
           </div>
-          <p class="text-[11px] leading-tight text-slate-400">Uma assinatura digital única será vinculada com a data e horário exatos da entrega.</p>
+
+          <div>
+            <h1 class="text-xl font-bold text-slate-800 dark:text-white tracking-tight leading-none flex items-center gap-2">
+              RetiraFácil <span class="text-xs bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded-full">AmorSaúde</span>
+            </h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Gestão Inteligente de Entrega de Exames</p>
+          </div>
+        </div>
+
+        <!-- STATUS, MODO ESCURO, TUTORIAL E REFRESH -->
+        <div class="flex items-center gap-2 md:gap-3">
+          <div id="sync-badge" class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700">
+            <i id="sync-icon" class="fas fa-sync-alt text-slate-400"></i>
+            <span id="sync-text">Conectando...</span>
+          </div>
+
+          <!-- Botão Guia/Tutorial -->
+          <button onclick="openTutorial()" class="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs transition flex items-center gap-1.5 font-medium" title="Como usar">
+            <i class="fas fa-question-circle text-[#45b7c9]"></i>
+            <span class="hidden sm:inline">Guia</span>
+          </button>
+
+          <!-- Alternador Modo Escuro -->
+          <button id="btn-theme-toggle" onclick="toggleTheme()" class="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs transition" title="Alternar tema">
+            <i id="theme-toggle-icon" class="fas fa-moon"></i>
+          </button>
+
+          <!-- Acesso administrativo: visibilidade controlada pelo perfil autenticado -->
+          <button id="btn-admin-access" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm" type="button">
+            <i class="fas fa-lock"></i>
+            <span class="hidden sm:inline">Admin</span>
+          </button>
+
+          <!-- Identificação e saída do usuário -->
+          <span id="current-user-name" class="hidden text-xs font-semibold text-slate-600 dark:text-slate-300"></span>
+          <button id="btn-logout" type="button" class="p-2 bg-rose-50 dark:bg-rose-950 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-600 dark:text-rose-300 rounded-lg text-xs transition" title="Sair do sistema">
+            <i class="fas fa-sign-out-alt"></i>
+            <span class="hidden sm:inline ml-1">Sair</span>
+          </button>
+
+          <button id="btn-force-reload" type="button" onclick="location.reload()" class="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs transition" title="Atualizar agora">
+            <i class="fas fa-redo-alt"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full">
+
+      <!-- PAINEL DE INDICADORES -->
+      <section class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5" aria-label="Resumo das entregas">
+        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex items-center gap-4 transition-colors">
+          <div class="w-11 h-11 rounded-xl bg-sky-100 dark:bg-sky-950/70 text-sky-600 dark:text-sky-300 flex items-center justify-center text-lg flex-shrink-0">
+            <i class="fas fa-flask"></i>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Total de exames</p>
+            <p id="stat-total" class="text-2xl font-bold text-slate-800 dark:text-white tabular-nums">0</p>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex items-center gap-4 transition-colors">
+          <div class="w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-300 flex items-center justify-center text-lg flex-shrink-0">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Exames entregues</p>
+            <p id="stat-delivered" class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">0</p>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex items-center gap-4 transition-colors">
+          <div class="w-11 h-11 rounded-xl bg-amber-100 dark:bg-amber-950/70 text-amber-600 dark:text-amber-300 flex items-center justify-center text-lg flex-shrink-0">
+            <i class="fas fa-clock"></i>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Aguardando entrega</p>
+            <p id="stat-pending" class="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">0</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- BARRA DE CONTROLES: PESQUISA E SELEÇÃO DE ABA -->
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 mb-6 flex flex-col md:flex-row items-center justify-between gap-4 transition-colors">
+
+        <!-- BUSCA DE PACIENTE -->
+        <div class="relative w-full md:w-96">
+          <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Buscar por paciente ou responsável..."
+            class="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#45b7c9] transition"
+            oninput="handleSearch()"
+          >
+          <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" type="button">
+            <i class="fas fa-times-circle"></i>
+          </button>
+        </div>
+
+        <!-- SELECT DE ABAS / MESES -->
+        <div class="flex items-center gap-2 w-full md:w-auto">
+          <label for="aba-select" class="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">Aba / Período:</label>
+          <select
+            id="aba-select"
+            onchange="changeAba()"
+            class="w-full md:w-auto bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-medium text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#45b7c9] transition"
+          >
+            <option value="">Carregando abas...</option>
+          </select>
         </div>
       </div>
 
-      <div class="bg-slate-50 dark:bg-slate-800/80 px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
-        <button onclick="closeModal()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-medium rounded-xl text-xs transition">Cancelar</button>
-        <button onclick="confirmarEntregaAction()" class="px-5 py-2 bg-[#45b7c9] hover:bg-[#3ba4b5] text-white font-bold rounded-xl text-xs transition shadow-md shadow-[#45b7c9]/30">Assinar & Confirmar</button>
+      <!-- TABELA DE RESULTADOS -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                <th class="py-3.5 px-4">Paciente</th>
+                <th class="py-3.5 px-4">Exame / Detalhes</th>
+                <th class="py-3.5 px-4">Data Retirada</th>
+                <th class="py-3.5 px-4">Assinatura Eletrônica</th>
+                <th class="py-3.5 px-4">Quem Retirou</th>
+                <th class="py-3.5 px-4 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="table-body" class="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+              <tr>
+                <td colspan="6" class="py-12 text-center text-slate-400">
+                  <i class="fas fa-spinner fa-spin text-2xl mb-2 text-[#45b7c9]"></i>
+                  <p>Carregando dados da planilha...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- MODAL DE CONFIRMAÇÃO E ASSINATURA ELETRÔNICA -->
+    <div id="modal-entrega" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-md overflow-hidden transform transition-all">
+        <div class="bg-slate-50 dark:bg-slate-800/80 px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+          <h3 class="font-bold text-slate-800 dark:text-white text-base flex items-center gap-2">
+            <i class="fas fa-file-signature text-[#45b7c9]"></i> Confirmar Entrega Digital
+          </h3>
+          <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition" type="button">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">Paciente</label>
+            <input type="text" id="modal-paciente" readonly class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold px-3 py-2 rounded-xl text-sm focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Quem está retirando? *</label>
+            <input type="text" id="modal-retirado-por" placeholder="Ex: O próprio paciente / Maria (Mãe)" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-white px-3 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-[#45b7c9] focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Seu Nome (Colaborador) *</label>
+            <input type="text" id="modal-colaborador" placeholder="Ex: Jean / Isabela" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-white px-3 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-[#45b7c9] focus:outline-none">
+          </div>
+
+          <!-- PAINEL DE ASSINATURA ELETRÔNICA (PREVIEW DO HASH) -->
+          <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs text-slate-500 dark:text-slate-400 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="font-medium text-slate-600 dark:text-slate-300"><i class="fas fa-shield-alt text-emerald-500 mr-1"></i> Carimbo Digital:</span>
+              <span id="preview-hash" class="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">#GERANDO</span>
+            </div>
+            <p class="text-[11px] leading-tight text-slate-400">Uma assinatura digital única será vinculada com a data e horário exatos da entrega.</p>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 dark:bg-slate-800/80 px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
+          <button onclick="closeModal()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-medium rounded-xl text-xs transition" type="button">Cancelar</button>
+          <button onclick="confirmarEntregaAction()" class="px-5 py-2 bg-[#45b7c9] hover:bg-[#3ba4b5] text-white font-bold rounded-xl text-xs transition shadow-md shadow-[#45b7c9]/30" type="button">Assinar &amp; Confirmar</button>
+        </div>
       </div>
     </div>
+
+    <!-- MODAL DE TUTORIAL / GUIA INTERATIVO -->
+    <div id="modal-tutorial" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-lg overflow-hidden">
+        <div class="bg-slate-50 dark:bg-slate-800/80 px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+          <h3 class="font-bold text-slate-800 dark:text-white text-base flex items-center gap-2">
+            <i class="fas fa-graduation-cap text-[#45b7c9]"></i> Guia Rápido de Uso - RetiraFácil
+          </h3>
+          <button onclick="closeTutorial()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition" type="button">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div class="p-6 space-y-4 text-sm text-slate-600 dark:text-slate-300 max-h-[70vh] overflow-y-auto">
+          <div class="flex gap-3 items-start">
+            <div class="w-7 h-7 rounded-full bg-[#45b7c9]/10 text-[#45b7c9] font-bold flex items-center justify-center flex-shrink-0">1</div>
+            <div>
+              <h4 class="font-semibold text-slate-800 dark:text-white">Busque o Paciente</h4>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Digite o nome no campo de pesquisa ou escolha a aba do mês correspondente.</p>
+            </div>
+          </div>
+
+          <div class="flex gap-3 items-start">
+            <div class="w-7 h-7 rounded-full bg-[#45b7c9]/10 text-[#45b7c9] font-bold flex items-center justify-center flex-shrink-0">2</div>
+            <div>
+              <h4 class="font-semibold text-slate-800 dark:text-white">Clique em "Entregar"</h4>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Insira quem está retirando o exame (o próprio paciente ou um responsável).</p>
+            </div>
+          </div>
+
+          <div class="flex gap-3 items-start">
+            <div class="w-7 h-7 rounded-full bg-[#45b7c9]/10 text-[#45b7c9] font-bold flex items-center justify-center flex-shrink-0">3</div>
+            <div>
+              <h4 class="font-semibold text-slate-800 dark:text-white">Assinatura Eletrônica Automática</h4>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Digite seu nome de colaborador. O sistema gerará a assinatura digital com carimbo de hora e código Hash de autenticidade direto na planilha.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 dark:bg-slate-800/80 px-6 py-3 border-t border-slate-100 dark:border-slate-800 text-right">
+          <button onclick="closeTutorial()" class="px-5 py-2 bg-[#45b7c9] hover:bg-[#3ba4b5] text-white font-bold rounded-xl text-xs transition" type="button">Entendi!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RODAPÉ -->
+    <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-4 mt-auto transition-colors">
+      <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
+        RetiraFácil AmorSaúde de Americana &copy; 2026 — Todos os direitos reservados.
+      </div>
+    </footer>
+
   </div>
-
-  <!-- MODAL DE TUTORIAL / GUIA INTERATIVO -->
-  <div id="modal-tutorial" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-    <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-lg overflow-hidden">
-      <div class="bg-slate-50 dark:bg-slate-800/80 px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-        <h3 class="font-bold text-slate-800 dark:text-white text-base flex items-center gap-2">
-          <i class="fas fa-graduation-cap text-[#45b7c9]"></i> Guia Rápido de Uso - RetiraFácil
-        </h3>
-        <button onclick="closeTutorial()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-
-      <div class="p-6 space-y-4 text-sm text-slate-600 dark:text-slate-300 max-h-[70vh] overflow-y-auto">
-        <div class="flex gap-3 items-start">
-          <div class="w-7 h-7 rounded-full bg-[#45b7c9]/10 text-[#45b7c9] font-bold flex items-center justify-center flex-shrink-0">1</div>
-          <div>
-            <h4 class="font-semibold text-slate-800 dark:text-white">Busque o Paciente</h4>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Digite o nome no campo de pesquisa ou escolha a aba do mês correspondente.</p>
-          </div>
-        </div>
-
-        <div class="flex gap-3 items-start">
-          <div class="w-7 h-7 rounded-full bg-[#45b7c9]/10 text-[#45b7c9] font-bold flex items-center justify-center flex-shrink-0">2</div>
-          <div>
-            <h4 class="font-semibold text-slate-800 dark:text-white">Clique em "Entregar"</h4>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Insira quem está retirando o exame (o próprio paciente ou um responsável).</p>
-          </div>
-        </div>
-
-        <div class="flex gap-3 items-start">
-          <div class="w-7 h-7 rounded-full bg-[#45b7c9]/10 text-[#45b7c9] font-bold flex items-center justify-center flex-shrink-0">3</div>
-          <div>
-            <h4 class="font-semibold text-slate-800 dark:text-white">Assinatura Eletrônica Automática</h4>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Digite seu nome de colaborador. O sistema gerará a assinatura digital com carimbo de hora e código Hash de autenticidade direto na planilha.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-slate-50 dark:bg-slate-800/80 px-6 py-3 border-t border-slate-100 dark:border-slate-800 text-right">
-        <button onclick="closeTutorial()" class="px-5 py-2 bg-[#45b7c9] hover:bg-[#3ba4b5] text-white font-bold rounded-xl text-xs transition">Entendi!</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- RODAPÉ -->
-  <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-4 mt-auto transition-colors">
-    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
-      RetiraFácil AmorSaúde de Americana &copy; 2026 — Todos os direitos reservados.
-    </div>
-  </footer>
 
   <!-- LÓGICA JAVASCRIPT SEPARADA -->
   <script src="app.js"></script>

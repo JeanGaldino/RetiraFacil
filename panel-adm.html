@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Administrativo | RetiraFácil</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script>tailwind.config={darkMode:'class'};try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}</script>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100">
+  <div id="loading" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-100 dark:bg-slate-950">
+    <div class="text-center px-6"><i class="fa-solid fa-circle-notch fa-spin text-4xl text-cyan-600"></i><p id="loading-message" class="mt-4 text-lg font-semibold">Verificando acesso administrativo...</p></div>
+  </div>
+  <div id="panel" class="hidden">
+    <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+      <div class="max-w-7xl mx-auto px-5 py-5 flex flex-wrap items-center justify-between gap-4">
+        <div><h1 class="text-2xl font-bold text-cyan-600">RetiraFácil <span class="text-slate-700 dark:text-slate-200">| Administração</span></h1><p class="text-sm text-slate-500 dark:text-slate-400">AmorSaúde • Controle e acompanhamento de exames</p></div>
+        <div class="flex flex-wrap gap-2"><button id="theme-button" class="rounded-xl px-4 py-2 bg-slate-100 dark:bg-slate-800" type="button" aria-label="Alternar tema"><i class="fa-solid fa-moon"></i></button><a href="index.html" class="rounded-xl px-4 py-2 bg-cyan-600 text-white font-semibold hover:bg-cyan-700"><i class="fa-solid fa-arrow-left mr-2"></i>Voltar à operação</a><button id="logout-button" type="button" class="rounded-xl px-4 py-2 bg-rose-600 text-white font-semibold hover:bg-rose-700">Sair</button></div>
+      </div>
+    </header>
+    <main class="max-w-7xl mx-auto px-5 py-8 space-y-7">
+      <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4" aria-label="Indicadores">
+        <article class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm"><p class="text-sm text-slate-500">Total de exames</p><p id="stat-total" class="text-3xl font-bold mt-2">0</p></article>
+        <article class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm"><p class="text-sm text-slate-500">Exames entregues</p><p id="stat-delivered" class="text-3xl font-bold mt-2 text-emerald-600">0</p></article>
+        <article class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm"><p class="text-sm text-slate-500">Aguardando entrega</p><p id="stat-pending" class="text-3xl font-bold mt-2 text-amber-600">0</p></article>
+        <article class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm"><p class="text-sm text-slate-500">Taxa de entrega</p><p id="stat-rate" class="text-3xl font-bold mt-2 text-cyan-600">0%</p></article>
+      </section>
+      <section class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm flex flex-wrap items-center justify-between gap-4"><div><h2 class="font-bold text-lg">Sincronização programada</h2><p class="text-sm text-slate-500">Próximo horário previsto: 18h (horário de Brasília)</p></div><div id="sync-timer" class="text-2xl font-mono font-bold text-cyan-600">--:--:--</div></section>
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl shadow-sm overflow-hidden"><div class="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3"><h2 class="font-bold text-lg">Auditoria de retiradas <span class="block text-xs font-normal text-slate-500">Somente hoje • horário de Brasília</span></h2><input id="audit-search" type="search" placeholder="Buscar paciente ou colaborador" class="w-full sm:w-72 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm"></div><div class="overflow-x-auto"><table class="min-w-full text-sm"><thead class="bg-slate-50 dark:bg-slate-800 text-left"><tr><th class="p-4">Paciente</th><th class="p-4">Exame</th><th class="p-4">Colaborador</th><th class="p-4">Retirado por</th><th class="p-4">Data da retirada</th></tr></thead><tbody id="audit-table-body"><tr><td colspan="5" class="p-5 text-center text-slate-500">Carregando...</td></tr></tbody></table></div></div>
+        <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm"><h2 class="p-6 border-b border-slate-200 dark:border-slate-800 font-bold text-lg">Ranking de colaboradores <span class="block text-xs font-normal text-slate-500">Entregas realizadas hoje</span></h2><div id="collab-ranking-list" class="p-6 space-y-3"><p class="text-slate-500">Carregando...</p></div></div>
+      </section>
+      <p id="data-status" class="text-xs text-slate-500 text-center" role="status"></p>
+    </main>
+  </div>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getFirestore, collection, doc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: 'AIzaSyD64_kOztghmGXcJOWF3IbTKHFlfRCedEk',
+      authDomain: 'retirafacil-75fd6.firebaseapp.com',
+      projectId: 'retirafacil-75fd6',
+      storageBucket: 'retirafacil-75fd6.firebasestorage.app',
+      messagingSenderId: '81541416059',
+      appId: '1:81541416059:web:7611e1cbf1bd05052fcede',
+      measurementId: 'G-62N41ZGE4S'
+    };
+    const APP_ID = 'retira-facil-app';
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    let unsubscribeExames = null;
+    let exames = [];
+    const $ = id => document.getElementById(id);
+    const clean = value => String(value ?? '').trim();
+    const escapeHTML = value => clean(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+    function mostrarErro(mensagem) {
+      $('loading-message').textContent = mensagem;
+      $('loading-message').classList.add('text-rose-600');
+      console.error('[RetiraFácil Admin]', mensagem);
+    }
+    function voltarLogin() { window.location.replace('index.html'); }
+    function foiEntregue(exame) {
+      // A retirada é reconhecida por uma data preenchida ou por um indicador explícito.
+      const data = clean(exame.dataRetirada);
+      return Boolean(data && !['-', 'null', 'undefined', 'não', 'nao', 'pendente'].includes(data.toLowerCase())) || exame.entregue === true || exame.retirado === true;
+    }
+    function formatarData(valor) {
+      if (!valor) return '—';
+      if (typeof valor?.toDate === 'function') return valor.toDate().toLocaleString('pt-BR');
+      const str = clean(valor);
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const d = new Date(str);
+        if (!Number.isNaN(d.getTime())) return d.toLocaleString('pt-BR');
+      }
+      return str;
+    }
+    // Data de retirada em horário de Brasília. Aceita Timestamp do Firebase,
+    // Date, ISO (com ou sem fuso) e datas brasileiras DD/MM/AAAA [HH:MM[:SS]].
+    const FUSO = 'America/Sao_Paulo';
+    function diaBrasilia(data = new Date()) {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: FUSO, year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(data);
+    }
+    function diaDaRetirada(valor) {
+      if (!valor) return null;
+      if (typeof valor.toDate === 'function') return diaBrasilia(valor.toDate());
+      if (valor instanceof Date) return Number.isNaN(valor.getTime()) ? null : diaBrasilia(valor);
+      if (typeof valor === 'object' && typeof valor.seconds === 'number')
+        return diaBrasilia(new Date(valor.seconds * 1000));
+      const str = clean(valor);
+      let m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[\s,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+      if (m) {
+        const [, dd, mm, yyyy] = m;
+        const check = new Date(Date.UTC(+yyyy, +mm - 1, +dd));
+        if (check.getUTCFullYear() !== +yyyy || check.getUTCMonth() !== +mm-1 || check.getUTCDate() !== +dd) return null;
+        return `${yyyy}-${mm}-${dd}`;
+      }
+      m = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](.*))?$/);
+      if (m && (!m[4] || !/[zZ]|[+-]\d{2}:?\d{2}$/.test(m[4]))) {
+        const check = new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
+        if (check.getUTCFullYear() !== +m[1] || check.getUTCMonth() !== +m[2]-1 || check.getUTCDate() !== +m[3]) return null;
+        return `${m[1]}-${m[2]}-${m[3]}`;
+      }
+      const parsed = new Date(str);
+      return Number.isNaN(parsed.getTime()) ? null : diaBrasilia(parsed);
+    }
+    function retiradasDeHoje() {
+      const hoje = diaBrasilia();
+      return exames.filter(e => foiEntregue(e) && diaDaRetirada(e.dataRetirada) === hoje);
+    }
+    function atualizarVisoesDiarias() {
+      renderAuditTable();
+      renderRanking();
+    }
+    function atualizarIndicadores() {
+      const total = exames.length;
+      const entregues = exames.filter(foiEntregue).length;
+      $('stat-total').textContent = total.toLocaleString('pt-BR');
+      $('stat-delivered').textContent = entregues.toLocaleString('pt-BR');
+      $('stat-pending').textContent = (total - entregues).toLocaleString('pt-BR');
+      $('stat-rate').textContent = total ? `${((entregues / total) * 100).toFixed(1).replace('.', ',')}%` : '0%';
+    }
+    function renderAuditTable() {
+      const termo = clean($('audit-search').value).toLocaleLowerCase('pt-BR');
+      const entregues = retiradasDeHoje().filter(exame => [exame.paciente, exame.exame, exame.colaborador, exame.quemRetirou].some(v => clean(v).toLocaleLowerCase('pt-BR').includes(termo)));
+      const tbody = $('audit-table-body');
+      if (!entregues.length) { tbody.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-slate-500">Nenhuma retirada registrada hoje.</td></tr>'; return; }
+      tbody.innerHTML = entregues.map(e => `<tr class="border-t border-slate-100 dark:border-slate-800"><td class="p-4 font-medium">${escapeHTML(e.paciente) || '—'}</td><td class="p-4">${escapeHTML(e.exame) || '—'}</td><td class="p-4">${escapeHTML(e.colaborador) || '—'}</td><td class="p-4">${escapeHTML(e.quemRetirou) || '—'}</td><td class="p-4 whitespace-nowrap">${escapeHTML(formatarData(e.dataRetirada))}</td></tr>`).join('');
+    }
+    function renderRanking() {
+      const contagem = new Map();
+      for (const e of retiradasDeHoje()) {
+        const nome = clean(e.colaborador);
+        if (nome) contagem.set(nome, (contagem.get(nome) || 0) + 1);
+      }
+      const ranking = [...contagem.entries()].sort((a,b) => b[1]-a[1]);
+      $('collab-ranking-list').innerHTML = ranking.length ? ranking.map(([nome, qtd], i) => `<div class="flex items-center justify-between gap-3"><div class="min-w-0"><span class="text-cyan-600 font-bold mr-2">${i+1}º</span><span class="break-words">${escapeHTML(nome)}</span></div><strong>${qtd}</strong></div>`).join('') : '<p class="text-slate-500">Nenhuma entrega registrada hoje.</p>';
+    }
+    function iniciarLeitura() {
+      if (unsubscribeExames) unsubscribeExames();
+      const ref = collection(db, 'artifacts', APP_ID, 'public', 'data', 'exames');
+      unsubscribeExames = onSnapshot(ref, snapshot => {
+        exames = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+        atualizarIndicadores(); atualizarVisoesDiarias();
+        $('data-status').textContent = `Dados atualizados • ${new Date().toLocaleString('pt-BR')}`;
+      }, error => {
+        console.error('Erro ao consultar exames:', error);
+        $('data-status').textContent = `Erro ao carregar exames: ${error.code || error.message}. Confira a sessão e as regras do Firestore.`;
+      });
+    }
+    function iniciarTimer() {
+      const atualizar = () => {
+        const partes = new Intl.DateTimeFormat('en-GB', {timeZone:'America/Sao_Paulo', hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23'}).formatToParts(new Date());
+        const p = Object.fromEntries(partes.map(x => [x.type, Number(x.value)]));
+        const atual = p.hour*3600 + p.minute*60 + p.second;
+        const alvo = 18*3600;
+        let restante = alvo - atual;
+        if (restante <= 0) restante += 86400;
+        const h = String(Math.floor(restante/3600)).padStart(2,'0');
+        const m = String(Math.floor((restante%3600)/60)).padStart(2,'0');
+        const s = String(restante%60).padStart(2,'0');
+        $('sync-timer').textContent = `${h}:${m}:${s}`;
+      };
+      atualizar(); setInterval(atualizar, 1000);
+    }
+    $('audit-search').addEventListener('input', renderAuditTable);
+    $('theme-button').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      try { localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light'); } catch(e) {}
+    });
+    $('logout-button').addEventListener('click', async () => {
+      if (unsubscribeExames) unsubscribeExames();
+      try { await signOut(auth); } finally { voltarLogin(); }
+    });
+    iniciarTimer();
+    // Atualiza também na virada do dia, mesmo sem novos eventos do Firestore.
+    let ultimoDiaExibido = diaBrasilia();
+    setInterval(() => {
+      const diaAtual = diaBrasilia();
+      if (diaAtual !== ultimoDiaExibido) {
+        ultimoDiaExibido = diaAtual;
+        atualizarVisoesDiarias();
+      }
+    }, 15000);
+    onAuthStateChanged(auth, async user => {
+      if (!user) { voltarLogin(); return; }
+      try {
+        const perfilRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'usuarios', user.uid);
+        const perfilDoc = await getDoc(perfilRef);
+        if (!perfilDoc.exists()) throw new Error('Seu perfil de usuário não foi encontrado.');
+        const perfil = perfilDoc.data();
+        if (perfil.ativo !== true) throw new Error('Seu usuário está inativo.');
+        if (clean(perfil.tipo).toLowerCase() !== 'admin') throw new Error('Acesso permitido apenas para administradores.');
+        $('loading').classList.add('hidden');
+        $('panel').classList.remove('hidden');
+        iniciarLeitura();
+      } catch(error) {
+        console.error('Falha na validação administrativa:', error);
+        mostrarErro(error.message || 'Não foi possível validar sua permissão.');
+        setTimeout(voltarLogin, 2500);
+      }
+    }, error => {
+      mostrarErro('Erro ao verificar autenticação: ' + error.message);
+    });
+  </script>
+</body>
+</html>
