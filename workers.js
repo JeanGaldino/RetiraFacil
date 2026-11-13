@@ -180,7 +180,7 @@ async function registerUser(request, env) {
   const accessToken=await getServiceToken(env);
   const endpoint="https://identitytoolkit.googleapis.com/v1/projects/"+encodeURIComponent(firebaseProject(env))+"/accounts";
   const email=usuario+"@retirafacil-75fd6.firebaseapp.com";
-  const created=await fetch(endpoint,{method:"POST",headers:{"Authorization":"Bearer "+accessToken,"Content-Type":"application/json"},
+  const created=await fetch(endpoint+":signUp",{method:"POST",headers:{"Authorization":"Bearer "+accessToken,"Content-Type":"application/json"},
     body:JSON.stringify({email,password:senha,displayName:nome,emailVerified:true,disabled:true})});
   const createdData=await created.json();
   if (!created.ok) {
@@ -201,7 +201,7 @@ async function registerUser(request, env) {
     console.error("Cadastro de perfil falhou:",profile.status,await profile.text());
     return json({error:"Conta criada desativada, mas o perfil não pôde ser salvo. Verifique as permissões do serviço Firebase."},502);
   }
-  const enable=await fetch(endpoint+":"+ "update",{method:"POST",headers:{"Authorization":"Bearer "+accessToken,"Content-Type":"application/json"},
+  const enable=await fetch(endpoint+":update",{method:"POST",headers:{"Authorization":"Bearer "+accessToken,"Content-Type":"application/json"},
     body:JSON.stringify({localId:uid,disabled:false})});
   if (!enable.ok) {
     console.error("Ativação falhou:",enable.status,await enable.text());
