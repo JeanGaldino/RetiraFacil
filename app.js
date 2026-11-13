@@ -364,8 +364,13 @@ function configurarBotaoSair() {
     botao.innerHTML =
       '<i class="fas fa-sign-out-alt"></i><span class="hidden sm:inline">Sair</span>';
 
-    botao.addEventListener("click", realizarLogout);
     areaBotoes.appendChild(botao);
+  }
+
+  // O botão já existe no HTML; registrar o evento também nesse caso.
+  if (botao.dataset.logoutBound !== "true") {
+    botao.addEventListener("click", realizarLogout);
+    botao.dataset.logoutBound = "true";
   }
 }
 
