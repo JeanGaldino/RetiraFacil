@@ -293,6 +293,8 @@ async function validarUsuarioAutenticado(user) {
     mostrarErroLogin(
       "Não foi possível validar seu cadastro. Verifique as regras do Firestore."
     );
+  } finally {
+    ocultarSplashLogin();
   }
 }
 
