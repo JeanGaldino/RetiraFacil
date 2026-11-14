@@ -12,6 +12,18 @@ export default {
     const url = new URL(request.url);
 
     try {
+      // Bloqueio global de manutenção: intercepta todas as páginas e APIs
+      // antes de qualquer autenticação ou operação com exames.
+      if (env.MAINTENANCE_MODE !== "off") {
+        if (request.method === "GET" && (url.pathname === "/favicon.ico" || url.pathname === "/robots.txt")) {
+          return new Response(null, {status: 204, headers: SECURITY_HEADERS});
+        }
+        if (request.method === "GET" && (url.pathname === "/maintenance" || url.pathname === "/maintenance.html" || url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/panel-adm.html" || !url.pathname.startsWith("/api/"))) {
+          return maintenancePage();
+        }
+        return json({error: "RetiraFácil temporariamente indisponível para manutenção."}, 503, {"Retry-After": "3600"});
+      }
+
       if (url.pathname === "/api/login" && request.method === "POST") {
         return await login(request, env);
       }
@@ -456,5 +468,39 @@ function json(data, status = 200, extraHeaders = {}) {
       ...SECURITY_HEADERS,
       ...extraHeaders
     }
+  });
+}
+
+function maintenancePage() {
+  const html = `<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#45b7c9">
+  <title>Em manutenção | RetiraFácil</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    body{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(145deg,#e8f8fa,#f8fafc 60%,#eaf0f7);color:#233345}
+    main{width:min(100%,480px);padding:44px 32px;text-align:center;background:#fff;border:1px solid #e1eaf0;border-radius:28px;box-shadow:0 24px 70px #17394b17}
+    .symbol{width:88px;height:88px;border-radius:24px;background:#e8f8fa;color:#278fa1;display:grid;place-items:center;margin:0 auto 24px;font-size:42px}
+    h1{font-size:30px;letter-spacing:-.7px;margin:0 0 12px}p{line-height:1.65;color:#5b6a7b;margin:0 0 18px}
+    .brand{font-size:14px;font-weight:750;letter-spacing:.3px;color:#269bb1;margin-bottom:18px}
+    .status{display:inline-flex;gap:9px;align-items:center;background:#fff5db;color:#956208;border-radius:99px;padding:9px 15px;font-size:13px;font-weight:700;margin:10px 0 26px}
+    .dot{width:8px;height:8px;background:#e0a122;border-radius:50%}
+    small{color:#83919e;display:block}
+  </style>
+</head>
+<body><main role="main">
+  <div class="symbol" aria-hidden="true">⚙</div>
+  <div class="brand">AmorSaúde · RetiraFácil</div>
+  <h1>Sistema em manutenção</h1>
+  <p>Estamos realizando ajustes para melhorar o funcionamento do RetiraFácil. Durante esse período, o acesso e as retiradas de exames estão temporariamente indisponíveis.</p>
+  <div class="status"><span class="dot"></span> Acesso temporariamente suspenso</div>
+  <small>Agradecemos a compreensão. Tente novamente mais tarde.</small>
+</main></body></html>`;
+  return new Response(html, {
+    status: 503,
+    headers: {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store, no-cache, must-revalidate", "Retry-After": "3600", "X-Content-Type-Options": "nosniff"}
   });
 }
