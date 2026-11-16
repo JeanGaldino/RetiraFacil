@@ -36,6 +36,13 @@ export default {
         return await logout(request, env);
       }
 
+      if (url.pathname === "/api/exames" && request.method === "GET") {
+        return await obterExamesCompartilhados(request, env);
+      }
+      if (url.pathname === "/api/exames/entregar" && request.method === "POST") {
+        return await entregarExamePlanilha(request, env);
+      }
+
       if (url.pathname === "/api/admin/verify" && request.method === "POST") {
         return await verifyAdminPassword(request, env);
       }
@@ -503,4 +510,79 @@ function maintenancePage() {
     status: 503,
     headers: {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store, no-cache, must-revalidate", "Retry-After": "3600", "X-Content-Type-Options": "nosniff"}
   });
+}
+
+
+const EXAMS_CACHE_KEY = "exames:sheets:v1";
+async function autorizarExames(request, env) {
+  const uid = await fetchAdminUid(request, env);
+  if (!uid) return {error:json({error:"Autenticação obrigatória."},401)};
+  const token = await accessTokenFirebase(env);
+  const perfil = await perfilPorUid(uid, token);
+  if (!perfil?.ativo || !["admin","colaborador"].includes(perfil.tipo)) {
+    return {error:json({error:"Colaborador sem permissão."},403)};
+  }
+  return {perfil};
+}
+async function chamarPlanilha(env, dados) {
+  if (!env.APPS_SCRIPT_WEBAPP_URL || !env.APPS_SCRIPT_SHARED_SECRET)
+    throw new Error("Configure APPS_SCRIPT_WEBAPP_URL e APPS_SCRIPT_SHARED_SECRET.");
+  const response = await fetch(env.APPS_SCRIPT_WEBAPP_URL,{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({...dados,secret:env.APPS_SCRIPT_SHARED_SECRET}),
+    redirect:"follow"
+  });
+  if (!response.ok) throw new Error("Apps Script HTTP "+response.status);
+  const result = await response.json();
+  if (result?.sucesso !== true) {
+    const error = new Error(result?.mensagem || "Planilha não confirmou operação.");
+    error.code = result?.codigo;
+    throw error;
+  }
+  return result;
+}
+async function obterExamesCompartilhados(request,env) {
+  if (!env.EXAMS_CACHE) return json({error:"Configure o binding EXAMS_CACHE."},503);
+  try {
+    const access = await autorizarExames(request,env);
+    if (access.error) return access.error;
+    const cached = await env.EXAMS_CACHE.get(EXAMS_CACHE_KEY,"json");
+    if (cached && Array.isArray(cached.exames)) return json({...cached,origem:"cache"});
+    const result = await chamarPlanilha(env,{acao:"listar"});
+    if (!Array.isArray(result.exames)) throw new Error("Resposta inválida.");
+    const snapshot={exames:result.exames,atualizadoEm:new Date().toISOString()};
+    await env.EXAMS_CACHE.put(EXAMS_CACHE_KEY,JSON.stringify(snapshot),{expirationTtl:300});
+    return json({...snapshot,origem:"planilha"});
+  } catch(error) {
+    console.error("Erro ao listar exames:",error);
+    return json({error:"Não foi possível consultar a planilha."},503);
+  }
+}
+async function entregarExamePlanilha(request,env) {
+  if (!env.EXAMS_CACHE) return json({error:"Configure o binding EXAMS_CACHE."},503);
+  if (!isSameOrigin(request)) return json({error:"Origem não autorizada."},403);
+  if (!(request.headers.get("Content-Type")||"").includes("application/json"))
+    return json({error:"Formato inválido."},415);
+  try {
+    const access = await autorizarExames(request,env);
+    if (access.error) return access.error;
+    const body=await request.json().catch(()=>null);
+    if (!body || typeof body.id!=="string" || !/^[a-zA-Z0-9_-]{8,128}$/.test(body.id) ||
+        typeof body.aba!=="string" || !body.aba || body.aba.length>120 ||
+        typeof body.retiradoPor!=="string" || !body.retiradoPor.trim() || body.retiradoPor.length>150)
+      return json({error:"Dados de retirada inválidos."},400);
+    const result=await chamarPlanilha(env,{
+      acao:"entregar",id:body.id,aba:body.aba,
+      colaborador:access.perfil.nome,retiradoPor:body.retiradoPor.trim()
+    });
+    try { await env.EXAMS_CACHE.delete(EXAMS_CACHE_KEY); }
+    catch(error) {console.error("Falha ao invalidar KV:",error);}
+    return json({success:true,entrega:result.entrega});
+  } catch(error) {
+    console.error("Erro ao entregar exame:",error);
+    if(error.code==="JA_ENTREGUE")return json({error:"Este exame já foi entregue."},409);
+    if(error.code==="NAO_ENCONTRADO")return json({error:"Exame não encontrado."},404);
+    return json({error:"Não foi possível registrar retirada."},503);
+  }
 }
