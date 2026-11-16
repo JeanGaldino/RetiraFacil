@@ -845,10 +845,13 @@ function renderTable() {
         }
       }
 
-      count++;
-
       const isEntregue =
         !!dataRetirada || !!colaborador;
+      const filtroStatus = document.getElementById("status-filter")?.value || "todos";
+      if (filtroStatus === "entregues" && !isEntregue) return;
+      if (filtroStatus === "pendentes" && isEntregue) return;
+
+      count++;
 
       const pacienteEncoded =
         encodeURIComponent(paciente);
