@@ -605,6 +605,9 @@ async function entregarExamePlanilha(request,env) {
     console.error("Erro ao entregar exame:",error);
     if(error.code==="JA_ENTREGUE")return json({error:"Este exame já foi entregue."},409);
     if(error.code==="NAO_ENCONTRADO")return json({error:"Exame não encontrado."},404);
-    return json({error:"Não foi possível registrar retirada."},503);
+    if(error.code==="CONFIG_APPS_SCRIPT")return json({error:"Configuração da integração com Google Sheets pendente no Cloudflare.",codigo:"CONFIG_APPS_SCRIPT",variaveisAusentes:error.missing || []},503);
+    if(typeof error.message==="string" && /^Apps Script HTTP [0-9]{3}$/.test(error.message))return json({error:"O Google Apps Script recusou a solicitação de retirada.",codigo:"APPS_SCRIPT_HTTP",statusAppsScript:Number(error.message.slice(-3))},503);
+    if(error instanceof SyntaxError)return json({error:"O Google Apps Script retornou uma resposta que não é JSON.",codigo:"APPS_SCRIPT_RESPOSTA_INVALIDA"},503);
+    return json({error:"Não foi possível registrar retirada.",codigo:typeof error.code==="string" && /^[A-Z_]{2,40}$/.test(error.code)?error.code:"ERRO_ENTREGA"},503);
   }
 }
