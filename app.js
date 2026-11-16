@@ -1070,7 +1070,7 @@ async function confirmarEntregaAction() {
   if (!currentUser || !currentUserProfile || currentUserProfile.ativo !== true) {
     showToast("Sua sessão não está autorizada.","warning"); return;
   }
-  if (!currentEditingPaciente || !retiradoPor || !colaborador || colaborador.length > 150 || !currentDocIdToUpdate || !currentAbaNomeToUpdate) {
+  if (!currentEditingPaciente || !retiradoPor || !colaborador || colaborador.length > 150 || !currentAbaNomeToUpdate) {
     showToast("Informe quem retirou, o nome do colaborador e selecione um exame válido.","warning"); return;
   }
   entregaEmAndamento = true;
@@ -1082,7 +1082,7 @@ async function confirmarEntregaAction() {
     const response = await fetch("/api/exames/entregar",{
       method:"POST",credentials:"same-origin",cache:"no-store",
       headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-      body:JSON.stringify({id:currentDocIdToUpdate,aba:currentAbaNomeToUpdate,retiradoPor,colaborador})
+      body:JSON.stringify({paciente:currentEditingPaciente,aba:currentAbaNomeToUpdate,retiradoPor,colaborador})
     });
     const result = await response.json().catch(()=>({}));
     if (!response.ok || !result.success) throw new Error(result.error || "Falha ao salvar retirada.");
