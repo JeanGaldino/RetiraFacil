@@ -146,7 +146,7 @@ async function checkAdminAccess(request, env) {
 function contaServico(env) {
   if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON não configurado.');
   const service = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
-  if (!service.client_email || !service.private_key || service.project_id !== 'retirafacil-75fd6') throw new Error('Credenciais Firebase inválidas.');
+  if (!service.client_email || !service.private_key || service.project_id !== 'retirafacil-v2') throw new Error('Credenciais Firebase inválidas.');
   return service;
 }
 function codificarBase64Url(value) {
@@ -177,7 +177,7 @@ async function accessTokenFirebase(env) {
   if (!res.ok || !data.access_token) throw new Error('Falha na autenticação da conta de serviço.');
   return data.access_token;
 }
-const FIRESTORE_USERS = 'projects/retirafacil-75fd6/databases/(default)/documents/artifacts/retira-facil-app/public/data/usuarios';
+const FIRESTORE_USERS = 'projects/retirafacil-v2/databases/(default)/documents/artifacts/retira-facil-app/public/data/usuarios';
 async function firebaseRequest(url, token, options = {}) {
   const res = await fetch(url, {...options,headers:{Authorization:'Bearer '+token,...(options.headers || {})}});
   const data = await res.json().catch(() => ({}));
@@ -262,7 +262,7 @@ async function gerenciarUsuarios(request,env) {
       const patch={fields:{ativo:{booleanValue:body.ativo}}};
       await firebaseRequest('https://firestore.googleapis.com/v1/'+FIRESTORE_USERS+'/'+uid+'?updateMask.fieldPaths=ativo',token,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
       // Também bloqueia o login de uma conta inativa no Firebase Authentication.
-      await firebaseRequest('https://identitytoolkit.googleapis.com/v1/projects/retirafacil-75fd6/accounts:update',token,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({localId:uid,disable:!body.ativo})});
+      await firebaseRequest('https://identitytoolkit.googleapis.com/v1/projects/retirafacil-v2/accounts:update',token,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({localId:uid,disable:!body.ativo})});
       return json({success:true});
     }
     const nome=typeof body.nome==='string'?body.nome.trim():'';
@@ -272,10 +272,10 @@ async function gerenciarUsuarios(request,env) {
     if(nome.length<3 || nome.length>100 || !/^[a-z0-9._-]{3,40}$/.test(usuario) ||
        typeof senha!=='string' || senha.length<8 || senha.length>128 || !['admin','colaborador'].includes(tipo))
       return json({error:'Informe nome, usuário válido, senha de no mínimo 8 caracteres e permissão.'},400);
-    const email=usuario+'@retirafacil-75fd6.firebaseapp.com';
+    const email=usuario+'@retirafacil-v2.firebaseapp.com';
     let created;
     try {
-      created=await firebaseRequest('https://identitytoolkit.googleapis.com/v1/projects/retirafacil-75fd6/accounts',token,{
+      created=await firebaseRequest('https://identitytoolkit.googleapis.com/v1/projects/retirafacil-v2/accounts',token,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({email,password:senha,emailVerified:true,disabled:false,displayName:nome})
       });
@@ -297,7 +297,7 @@ async function gerenciarUsuarios(request,env) {
       });
     } catch(e) {
       // Conta sem perfil não pode acessar o sistema; tenta desfazer sua criação.
-      try {await firebaseRequest('https://identitytoolkit.googleapis.com/v1/projects/retirafacil-75fd6/accounts:delete',token,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({localId:newUid})})} catch(rollbackError) {console.error('Falha no rollback de cadastro:',rollbackError)}
+      try {await firebaseRequest('https://identitytoolkit.googleapis.com/v1/projects/retirafacil-v2/accounts:delete',token,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({localId:newUid})})} catch(rollbackError) {console.error('Falha no rollback de cadastro:',rollbackError)}
       throw e;
     }
     return json({success:true,uid:newUid},201);
