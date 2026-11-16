@@ -591,11 +591,12 @@ async function entregarExamePlanilha(request,env) {
     const body=await request.json().catch(()=>null);
     if (!body || typeof body.id!=="string" || !/^[a-zA-Z0-9_-]{8,128}$/.test(body.id) ||
         typeof body.aba!=="string" || !body.aba || body.aba.length>120 ||
-        typeof body.retiradoPor!=="string" || !body.retiradoPor.trim() || body.retiradoPor.length>150)
+        typeof body.retiradoPor!=="string" || !body.retiradoPor.trim() || body.retiradoPor.length>150 ||
+        typeof body.colaborador!=="string" || !body.colaborador.trim() || body.colaborador.length>150)
       return json({error:"Dados de retirada inválidos."},400);
     const result=await chamarPlanilha(env,{
       acao:"entregar",id:body.id,aba:body.aba,
-      colaborador:access.perfil.nome,retiradoPor:body.retiradoPor.trim()
+      colaborador:body.colaborador.trim(),retiradoPor:body.retiradoPor.trim()
     });
     try { await env.EXAMS_CACHE.delete(EXAMS_CACHE_KEY); }
     catch(error) {console.error("Falha ao invalidar KV:",error);}
