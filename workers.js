@@ -615,13 +615,13 @@ async function entregarExamePlanilha(request,env) {
     const access = await autorizarExames(request,env);
     if (access.error) return access.error;
     const body=await request.json().catch(()=>null);
-    if (!body || typeof body.id!=="string" || !/^[a-zA-Z0-9_-]{8,128}$/.test(body.id) ||
+    if (!body || typeof body.paciente!=="string" || !body.paciente.trim() || body.paciente.length>200 ||
         typeof body.aba!=="string" || !body.aba || body.aba.length>120 ||
         typeof body.retiradoPor!=="string" || !body.retiradoPor.trim() || body.retiradoPor.length>150 ||
         typeof body.colaborador!=="string" || !body.colaborador.trim() || body.colaborador.length>150)
       return json({error:"Dados de retirada inválidos."},400);
     const result=await chamarPlanilha(env,{
-      acao:"entregar",id:body.id,aba:body.aba,
+      acao:"entregar",paciente:body.paciente.trim(),aba:body.aba,
       colaborador:body.colaborador.trim(),retiradoPor:body.retiradoPor.trim()
     });
     try { await env.EXAMS_CACHE.delete(EXAMS_CACHE_KEY); }
@@ -634,7 +634,9 @@ async function entregarExamePlanilha(request,env) {
     if(error.code==="APPS_SCRIPT_REJEITOU") {
       const codigoScript=error.scriptCode;
       if(codigoScript==="JA_ENTREGUE") return json({error:"Este exame já consta como entregue na planilha.",codigo:"JA_ENTREGUE"},409);
-      if(codigoScript==="NAO_ENCONTRADO") return json({error:"O Apps Script não encontrou o exame na aba informada.",codigo:"NAO_ENCONTRADO"},404);
+      if(codigoScript==="NAO_ENCONTRADO") return json({error:"O Apps Script não encontrou o nome do paciente na aba informada.",codigo:"NAO_ENCONTRADO"},404);
+      if(codigoScript==="AMBIGUO") return json({error:"Existem registros com o mesmo nome nesta aba. Confirme a linha na planilha antes de registrar.",codigo:"AMBIGUO"},409);
+      if(codigoScript==="INVALIDO") return json({error:"Os dados enviados para retirada são inválidos.",codigo:"INVALIDO"},400);
       return json({error:"O Google Apps Script rejeitou a gravação da retirada.",codigo:"APPS_SCRIPT_REJEITOU",codigoScript},503);
     }
     if(error.code==="CONFIG_APPS_SCRIPT")return json({error:"Configuração da integração com Google Sheets pendente no Cloudflare.",codigo:"CONFIG_APPS_SCRIPT",variaveisAusentes:error.missing || []},503);
