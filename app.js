@@ -19,7 +19,7 @@ const APPS_SCRIPT_WEBAPP_URL =
   "https://script.google.com/macros/s/AKfycbwIORD0w7FPGt1ShtPrnos3iCj2oNc6fT1B3u-8fmcZ1FGVdzo29_Cnx_47CCqQKSQVsg/exec";
 
 // Caminhos do Firestore
-const FIRESTORE_APP_ID = "retirafacil-v2";
+const FIRESTORE_APP_ID = "retira-facil-app";
 const FIRESTORE_BASE = "artifacts";
 
 // Estado da aplicação
