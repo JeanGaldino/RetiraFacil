@@ -545,17 +545,39 @@ async function chamarPlanilha(env, dados) {
     error.code = "CONFIG_APPS_SCRIPT";
     throw error;
   }
-  const response = await fetch(env.APPS_SCRIPT_WEBAPP_URL,{
-    method:"POST",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify({...dados,secret:env.APPS_SCRIPT_SHARED_SECRET}),
-    redirect:"follow"
-  });
-  if (!response.ok) throw new Error("Apps Script HTTP "+response.status);
-  const result = await response.json();
+  let response;
+  try {
+    response = await fetch(env.APPS_SCRIPT_WEBAPP_URL,{
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({...dados,secret:env.APPS_SCRIPT_SHARED_SECRET}),
+      redirect:"follow"
+    });
+  } catch (cause) {
+    console.error("Falha de rede ao chamar Apps Script:",cause);
+    const error = new Error("Falha de conexão com Google Apps Script.");
+    error.code = "APPS_SCRIPT_REDE";
+    throw error;
+  }
+  if (!response.ok) {
+    const error = new Error("Apps Script HTTP " + response.status);
+    error.code = "APPS_SCRIPT_HTTP";
+    error.httpStatus = response.status;
+    throw error;
+  }
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    const error = new Error("Resposta do Apps Script não é JSON.");
+    error.code = "APPS_SCRIPT_RESPOSTA_INVALIDA";
+    throw error;
+  }
   if (result?.sucesso !== true) {
-    const error = new Error(result?.mensagem || "Planilha não confirmou operação.");
-    error.code = result?.codigo;
+    const error = new Error("Apps Script não confirmou a operação.");
+    error.code = "APPS_SCRIPT_REJEITOU";
+    error.scriptCode = typeof result?.codigo === "string" && /^[A-Z_]{2,40}$/.test(result.codigo) ? result.codigo : null;
+    console.error("Apps Script rejeitou operação:",{codigo:error.scriptCode,acao:dados.acao});
     throw error;
   }
   return result;
@@ -577,6 +599,10 @@ async function obterExamesCompartilhados(request,env) {
     if (error.code === "CONFIG_APPS_SCRIPT") {
       return json({error:"Configuração da integração com Google Sheets pendente no Cloudflare.",codigo:"CONFIG_APPS_SCRIPT",variaveisAusentes:error.missing || []},503);
     }
+    if (error.code === "APPS_SCRIPT_HTTP") return json({error:"Google Apps Script respondeu com erro HTTP.",codigo:error.code,statusAppsScript:error.httpStatus},503);
+    if (error.code === "APPS_SCRIPT_RESPOSTA_INVALIDA") return json({error:"Google Apps Script não retornou JSON. Verifique a implantação e permissões.",codigo:error.code},503);
+    if (error.code === "APPS_SCRIPT_REJEITOU") return json({error:"Google Apps Script não autorizou ou não concluiu a consulta.",codigo:error.code,codigoScript:error.scriptCode},503);
+    if (error.code === "APPS_SCRIPT_REDE") return json({error:"Não foi possível conectar ao Google Apps Script.",codigo:error.code},503);
     return json({error:"Não foi possível consultar a planilha.",codigo:"ERRO_PLANILHA"},503);
   }
 }
