@@ -32,6 +32,11 @@ let auth = null;
 let currentUser = null;
 let currentUserProfile = null;
 let unsubscribeExames = null;
+let examesPollTimer = null;
+let examesSyncGeneration = 0;
+let examesRequestInFlight = false;
+let entregaEmAndamento = false;
+const entregasLocaisPendentes = new Map();
 let unsubscribeAvisos = null;
 let avisoAtualId = null;
 let currentDocIdToUpdate = "";
@@ -397,10 +402,8 @@ async function realizarLogout() {
 function encerrarSessaoVisual() {
   ocultarSplashLogin();
   fecharModalSenhaAdmin();
-  if (typeof unsubscribeExames === "function") {
-    unsubscribeExames();
-    unsubscribeExames = null;
-  }
+  pararSincronizacaoExames();
+  entregasLocaisPendentes.clear();
 
   if (typeof unsubscribeAvisos === "function") unsubscribeAvisos();
   unsubscribeAvisos = null;
@@ -463,87 +466,73 @@ function limparErroLogin() {
 // SINCRONIZAÇÃO EM TEMPO REAL DOS EXAMES
 // ======================================================
 
-function iniciarSincronizacaoExames() {
-  if (!db || !currentUser || !currentUserProfile) return;
-
-  if (typeof unsubscribeExames === "function") {
-    unsubscribeExames();
-    unsubscribeExames = null;
-  }
-
-  updateSyncStatus("syncing", "Conectando aos exames...");
-
-  unsubscribeExames = db
-    .collection(FIRESTORE_BASE)
-    .doc(FIRESTORE_APP_ID)
-    .collection("public")
-    .doc("data")
-    .collection("exames")
-    .onSnapshot((snapshot) => {
-      const examesAgrupados = {};
-
-      snapshot.forEach((docItem) => {
-        const item = docItem.data();
-        const nomeAba =
-          item.abaOrigem || item.aba || "Exames Geral";
-
-        if (!examesAgrupados[nomeAba]) {
-          examesAgrupados[nomeAba] = {
-            aba: nomeAba,
-            dados: []
-          };
-        }
-
-        let dataFormatada = item.dataRetirada || "";
-
-        if (dataFormatada.length > 15) {
-          try {
-            const data = new Date(dataFormatada);
-
-            if (!isNaN(data.getTime())) {
-              dataFormatada = data.toLocaleDateString("pt-BR");
-            }
-          } catch (erro) {
-            console.warn("Não foi possível formatar a data:", erro);
-          }
-        }
-
-        examesAgrupados[nomeAba].dados.push([
-          item.paciente || "",
-          item.exame || "",
-          "",
-          "",
-          dataFormatada,
-          "",
-          item.colaborador || "",
-          "",
-          item.quemRetirou || "",
-          docItem.id
-        ]);
-      });
-
-      sheetsData = Object.values(examesAgrupados);
-
-      if (sheetsData.length === 0) {
-        updateSyncStatus("success", "Conectado (sem exames)");
-      } else {
-        updateSyncStatus("success", "Conectado (Firebase)");
-      }
-
-      populateAbasSelect();
-      renderTable();
-
-    }, (error) => {
-      console.error("Erro ao escutar Firestore:", error);
-      updateSyncStatus("error", "Erro ao carregar exames");
-
-      showToast(
-        "Não foi possível carregar os exames. Verifique as regras do Firebase.",
-        "warning"
-      );
-    });
+const EXAMES_POLL_INTERVAL_MS = 300000;
+function pararSincronizacaoExames() {
+  examesSyncGeneration++;
+  if (examesPollTimer !== null) clearInterval(examesPollTimer);
+  examesPollTimer = null;
+  if (typeof unsubscribeExames === "function") unsubscribeExames();
+  unsubscribeExames = null;
 }
-
+function iniciarSincronizacaoExames() {
+  if (!auth || !currentUser || !currentUserProfile) return;
+  pararSincronizacaoExames();
+  updateSyncStatus("syncing", "Carregando exames da planilha...");
+  const generation = examesSyncGeneration;
+  void atualizarExamesCompartilhados(generation);
+  examesPollTimer = setInterval(() => {
+    if (document.visibilityState === "visible") void atualizarExamesCompartilhados(generation);
+  }, EXAMES_POLL_INTERVAL_MS);
+}
+async function atualizarExamesCompartilhados(generation = examesSyncGeneration) {
+  if (examesRequestInFlight || !auth?.currentUser) return;
+  examesRequestInFlight = true;
+  try {
+    const user = auth.currentUser;
+    const token = await user.getIdToken();
+    const response = await fetch("/api/exames", {
+      method: "GET", headers: {Authorization:"Bearer "+token},
+      credentials: "same-origin", cache: "no-store"
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || "Falha ao carregar exames.");
+    if (!Array.isArray(payload.exames)) throw new Error("Resposta de exames inválida.");
+    if (generation !== examesSyncGeneration || auth.currentUser?.uid !== user.uid) return;
+    const agrupados = {};
+    for (const original of payload.exames) {
+      const item = {...original};
+      const id = String(item.id || "");
+      const local = entregasLocaisPendentes.get(id);
+      if (local) {
+        if (item.dataRetirada || item.colaborador) entregasLocaisPendentes.delete(id);
+        else Object.assign(item, local);
+      }
+      const nomeAba = item.abaOrigem || item.aba || "Exames Geral";
+      if (!agrupados[nomeAba]) agrupados[nomeAba] = {aba:nomeAba,dados:[]};
+      let data = String(item.dataRetirada || "");
+      if (data.length > 15) {
+        const parsed = new Date(data);
+        if (!Number.isNaN(parsed.getTime())) data = parsed.toLocaleDateString("pt-BR");
+      }
+      agrupados[nomeAba].dados.push([
+        item.paciente || "",item.exame || "","","",data,"",
+        item.colaborador || "","",item.quemRetirou || "",id
+      ]);
+    }
+    sheetsData = Object.values(agrupados);
+    populateAbasSelect();
+    renderTable();
+    updateSyncStatus("success",sheetsData.length?"Conectado (planilha/KV)":"Conectado (sem exames)");
+  } catch(error) {
+    if (generation === examesSyncGeneration) {
+      console.error("Erro ao consultar exames:",error);
+      updateSyncStatus("error","Falha ao atualizar exames");
+      if (!sheetsData.length) showToast("Não foi possível carregar exames: "+error.message,"warning");
+    }
+  } finally {
+    examesRequestInFlight = false;
+  }
+}
 
 // ======================================================
 // MODO ESCURO
@@ -787,7 +776,7 @@ function renderTable() {
       <tr>
         <td colspan="6" class="py-10 text-center text-slate-400">
           <i class="fas fa-inbox text-3xl mb-2 block"></i>
-          Nenhum exame encontrado no Firebase.
+          Nenhum exame encontrado na planilha.
         </td>
       </tr>
     `;
@@ -1075,139 +1064,53 @@ function openEntregaModal(
 // ======================================================
 
 async function confirmarEntregaAction() {
-  const paciente = currentEditingPaciente;
-
-  const retiradoPorEl =
-    document.getElementById("modal-retirado-por");
-
-  const retiradoPor = retiradoPorEl
-    ? retiradoPorEl.value.trim()
-    : "";
-
-  // O nome vem do perfil autenticado, nunca do campo editável.
-  if (
-    !currentUser ||
-    !currentUserProfile ||
-    currentUserProfile.ativo !== true
-  ) {
-    showToast(
-      "Sua sessão não está autorizada. Entre novamente.",
-      "warning"
-    );
-    return;
+  if (entregaEmAndamento) return;
+  const retiradoPor = document.getElementById("modal-retirado-por")?.value.trim() || "";
+  if (!currentUser || !currentUserProfile || currentUserProfile.ativo !== true) {
+    showToast("Sua sessão não está autorizada.","warning"); return;
   }
-
-  const colaborador = currentUserProfile.nome;
-
-  if (!paciente) {
-    showToast(
-      "Não foi possível identificar o paciente.",
-      "warning"
-    );
-    return;
+  if (!currentEditingPaciente || !retiradoPor || !currentDocIdToUpdate || !currentAbaNomeToUpdate) {
+    showToast("Informe quem retirou e selecione um exame válido.","warning"); return;
   }
-
-  if (!retiradoPor) {
-    showToast(
-      "Informe quem está retirando o exame.",
-      "warning"
-    );
-    return;
-  }
-
-  if (!db || !currentDocIdToUpdate) {
-    showToast(
-      "Não foi possível identificar o registro no Firebase.",
-      "warning"
-    );
-    return;
-  }
-
-  const now = new Date();
-  const dataHoje = now.toLocaleDateString("pt-BR");
-
-  const horaHoje = now.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-
-  const hash =
-    "#" +
-    Math.random().toString(36).substring(2, 7).toUpperCase();
-
-  const assinaturaFormatada =
-    `${colaborador.toUpperCase()} [ENTREGA DIGITAL: ${dataHoje} ${horaHoje} HASH: ${hash}]`;
-
-  showToast("Gravando entrega no Firebase...", "info");
-
-  // Primeiro grava no Firebase.
+  entregaEmAndamento = true;
+  const botao = document.querySelector('#modal-entrega button[onclick="confirmarEntregaAction()"]');
+  if (botao) botao.disabled = true;
+  showToast("Registrando retirada na planilha...","info");
   try {
-    await db
-      .collection(FIRESTORE_BASE)
-      .doc(FIRESTORE_APP_ID)
-      .collection("public")
-      .doc("data")
-      .collection("exames")
-      .doc(currentDocIdToUpdate)
-      .update({
-        dataRetirada: dataHoje,
-        colaborador: assinaturaFormatada,
-        quemRetirou: retiradoPor
-      });
-
-  } catch (erroFirebase) {
-    console.error(
-      "Erro ao atualizar Firebase:",
-      erroFirebase
-    );
-
-    showToast(
-      "Não foi possível salvar no Firebase.",
-      "warning"
-    );
-    return;
-  }
-
-  // Depois envia para a planilha e aguarda confirmação.
-  try {
-    showToast(
-      "Firebase atualizado. Gravando na planilha...",
-      "info"
-    );
-
-    const resultado = await enviarParaPlanilha({
-      aba: currentAbaNomeToUpdate || "Exames Geral",
-      paciente: paciente,
-      dataEntrega: dataHoje,
-      colaborador: assinaturaFormatada,
-      retiradoPor: retiradoPor
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch("/api/exames/entregar",{
+      method:"POST",credentials:"same-origin",cache:"no-store",
+      headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+      body:JSON.stringify({id:currentDocIdToUpdate,aba:currentAbaNomeToUpdate,retiradoPor})
     });
-
-    console.log("Confirmação da planilha:", resultado);
-
+    const result = await response.json().catch(()=>({}));
+    if (!response.ok || !result.success) throw new Error(result.error || "Falha ao salvar retirada.");
+    const entrega = result.entrega || {};
+    const local = {
+      dataRetirada:entrega.dataRetirada || new Date().toLocaleDateString("pt-BR"),
+      colaborador:entrega.colaborador || currentUserProfile.nome,
+      quemRetirou:entrega.quemRetirou || retiradoPor
+    };
+    entregasLocaisPendentes.set(currentDocIdToUpdate,local);
+    for (const aba of sheetsData) {
+      const row=aba.dados.find(r=>r[9]===currentDocIdToUpdate);
+      if(row){row[4]=local.dataRetirada;row[6]=local.colaborador;row[8]=local.quemRetirou;}
+    }
+    renderTable();
     closeModal();
-
-    showToast(
-      "Entrega salva no Firebase e na Planilha!",
-      "success"
-    );
-
-  } catch (erroPlanilha) {
-    console.error(
-      "Firebase foi atualizado, mas a planilha falhou:",
-      erroPlanilha
-    );
-
-    closeModal();
-
-    showToast(
-      "Firebase salvo, mas a planilha não confirmou: " +
-      erroPlanilha.message,
-      "warning"
-    );
+    showToast("Retirada registrada na planilha!","success");
+    void atualizarExamesCompartilhados();
+  } catch(error) {
+    console.error("Erro ao registrar retirada:",error);
+    showToast(error.message,"warning");
+    if (/já foi entregue|ja foi entregue/i.test(error.message)) {
+      closeModal(); void atualizarExamesCompartilhados();
+    }
+  } finally {
+    entregaEmAndamento=false;
+    if(botao)botao.disabled=false;
   }
 }
-
 
 // ======================================================
 // ACESSO ADMINISTRATIVO
