@@ -62,13 +62,13 @@
     import { getFirestore, collection, doc, getDoc, onSnapshot, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
     const firebaseConfig = {
-      apiKey: 'AIzaSyD64_kOztghmGXcJOWF3IbTKHFlfRCedEk',
-      authDomain: 'retirafacil-75fd6.firebaseapp.com',
-      projectId: 'retirafacil-75fd6',
-      storageBucket: 'retirafacil-75fd6.firebasestorage.app',
-      messagingSenderId: '81541416059',
-      appId: '1:81541416059:web:7611e1cbf1bd05052fcede',
-      measurementId: 'G-62N41ZGE4S'
+      apiKey: "AIzaSyAVziMgrM1zKUqITTVzxAR2_69Tx2-s_hY",
+      authDomain: "retirafacil-v2.firebaseapp.com",
+      projectId: "retirafacil-v2",
+      storageBucket: "retirafacil-v2.firebasestorage.app",
+      messagingSenderId: "186933697505",
+      appId: "1:186933697505:web:7a095646b976ec8c1550a0",
+      measurementId: "G-4FVMXVH1DJ"
     };
     const APP_ID = 'retira-facil-app';
     const app = initializeApp(firebaseConfig);
@@ -166,17 +166,35 @@
       const ranking = [...contagem.entries()].sort((a,b) => b[1]-a[1]);
       $('collab-ranking-list').innerHTML = ranking.length ? ranking.map(([nome, qtd], i) => `<div class="flex items-center justify-between gap-3"><div class="min-w-0"><span class="text-cyan-600 font-bold mr-2">${i+1}º</span><span class="break-words">${escapeHTML(nome)}</span></div><strong>${qtd}</strong></div>`).join('') : '<p class="text-slate-500">Nenhuma entrega registrada hoje.</p>';
     }
-    function iniciarLeitura() {
-      if (unsubscribeExames) unsubscribeExames();
-      const ref = collection(db, 'artifacts', APP_ID, 'public', 'data', 'exames');
-      unsubscribeExames = onSnapshot(ref, snapshot => {
-        exames = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
-        atualizarIndicadores(); atualizarVisoesDiarias();
-        $('data-status').textContent = `Dados atualizados • ${new Date().toLocaleString('pt-BR')}`;
-      }, error => {
+    let examesTimer = null;
+    async function atualizarExamesAdmin() {
+      if (!auth.currentUser || !administradorUid) return;
+      try {
+        const token = await auth.currentUser.getIdToken();
+        const response = await fetch('/api/exames', {
+          method: 'GET',
+          headers: {Authorization: 'Bearer ' + token},
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Falha ao consultar exames.');
+        if (!Array.isArray(data.exames)) throw new Error('Resposta de exames inválida.');
+        exames = data.exames;
+        atualizarIndicadores();
+        atualizarVisoesDiarias();
+        $('data-status').textContent = 'Dados atualizados • ' + new Date().toLocaleString('pt-BR');
+      } catch (error) {
         console.error('Erro ao consultar exames:', error);
-        $('data-status').textContent = `Erro ao carregar exames: ${error.code || error.message}. Confira a sessão e as regras do Firestore.`;
-      });
+        $('data-status').textContent = 'Erro ao carregar exames: ' + error.message;
+      }
+    }
+    function iniciarLeitura() {
+      if (examesTimer) clearInterval(examesTimer);
+      atualizarExamesAdmin();
+      examesTimer = setInterval(() => {
+        if (!document.hidden) atualizarExamesAdmin();
+      }, 300000);
     }
     function iniciarTimer() {
       const atualizar = () => {
