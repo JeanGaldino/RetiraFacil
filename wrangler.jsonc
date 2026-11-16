@@ -12,6 +12,10 @@
     {
       "binding": "EXAMS_CACHE",
       "id": "63dad52afec745a89aec4f224430a101"
+    },
+    {
+      "binding": "SESSIONS",
+      "id": "6b3d62f5fbfd4b968add7e9e7f47c1b0"
     }
   ]
 }
