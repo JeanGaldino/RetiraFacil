@@ -1,0 +1,20 @@
+
+# Variáveis de ambiente e senhas
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
+
+# Dependências
+node_modules/
+
+# Arquivos temporários do Wrangler
+.wrangler/
+
+# Logs
+*.log
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db

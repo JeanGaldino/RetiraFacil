@@ -5,21 +5,21 @@
 
 // Configurações reais do seu projeto Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyD64_kOztghmGXcJOWF3IbTKHFlfRCedEk",
-  authDomain: "retirafacil-75fd6.firebaseapp.com",
-  projectId: "retirafacil-75fd6",
-  storageBucket: "retirafacil-75fd6.firebasestorage.app",
-  messagingSenderId: "81541416059",
-  appId: "1:81541416059:web:7611e1cbf1bd05052fcede",
-  measurementId: "G-62N41ZGE4S"
+  apiKey: "AIzaSyAVziMgrM1zKUqITTVzxAR2_69Tx2-s_hY",
+  authDomain: "retirafacil-v2.firebaseapp.com",
+  projectId: "retirafacil-v2",
+  storageBucket: "retirafacil-v2.firebasestorage.app",
+  messagingSenderId: "186933697505",
+  appId: "1:186933697505:web:7a095646b976ec8c1550a0",
+  measurementId: "G-4FVMXVH1DJ"
 };
 
 // URL de envio para a planilha Google Sheets
 const APPS_SCRIPT_WEBAPP_URL =
-  "https://script.google.com/macros/s/AKfycbz2DOHliN6C1hdVNn2hn1QYVaG3mBUmVNkMDoSdWDMJhhbDslDEol1YPmelJQfoC5w3Dg/exec";
+  "https://script.google.com/macros/s/AKfycbwIORD0w7FPGt1ShtPrnos3iCj2oNc6fT1B3u-8fmcZ1FGVdzo29_Cnx_47CCqQKSQVsg/exec";
 
 // Caminhos do Firestore
-const FIRESTORE_APP_ID = "retira-facil-app";
+const FIRESTORE_APP_ID = "retirafacil-v2";
 const FIRESTORE_BASE = "artifacts";
 
 // Estado da aplicação
