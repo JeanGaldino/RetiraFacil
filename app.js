@@ -328,8 +328,8 @@ function mostrarAplicacao() {
     document.getElementById("modal-colaborador");
 
   if (colaboradorInput) {
-    colaboradorInput.value = currentUserProfile.nome;
-    colaboradorInput.readOnly = true;
+    colaboradorInput.value = "";
+    colaboradorInput.readOnly = false;
   }
 
   const adminButton =
@@ -695,8 +695,8 @@ function loadColaboradorSalvo() {
   const input = document.getElementById("modal-colaborador");
 
   if (input && currentUserProfile) {
-    input.value = currentUserProfile.nome;
-    input.readOnly = true;
+    input.value = "";
+    input.readOnly = false;
   }
 }
 
@@ -1066,11 +1066,12 @@ function openEntregaModal(
 async function confirmarEntregaAction() {
   if (entregaEmAndamento) return;
   const retiradoPor = document.getElementById("modal-retirado-por")?.value.trim() || "";
+  const colaborador = document.getElementById("modal-colaborador")?.value.trim() || "";
   if (!currentUser || !currentUserProfile || currentUserProfile.ativo !== true) {
     showToast("Sua sessão não está autorizada.","warning"); return;
   }
-  if (!currentEditingPaciente || !retiradoPor || !currentDocIdToUpdate || !currentAbaNomeToUpdate) {
-    showToast("Informe quem retirou e selecione um exame válido.","warning"); return;
+  if (!currentEditingPaciente || !retiradoPor || !colaborador || colaborador.length > 150 || !currentDocIdToUpdate || !currentAbaNomeToUpdate) {
+    showToast("Informe quem retirou, o nome do colaborador e selecione um exame válido.","warning"); return;
   }
   entregaEmAndamento = true;
   const botao = document.querySelector('#modal-entrega button[onclick="confirmarEntregaAction()"]');
@@ -1081,14 +1082,14 @@ async function confirmarEntregaAction() {
     const response = await fetch("/api/exames/entregar",{
       method:"POST",credentials:"same-origin",cache:"no-store",
       headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-      body:JSON.stringify({id:currentDocIdToUpdate,aba:currentAbaNomeToUpdate,retiradoPor})
+      body:JSON.stringify({id:currentDocIdToUpdate,aba:currentAbaNomeToUpdate,retiradoPor,colaborador})
     });
     const result = await response.json().catch(()=>({}));
     if (!response.ok || !result.success) throw new Error(result.error || "Falha ao salvar retirada.");
     const entrega = result.entrega || {};
     const local = {
       dataRetirada:entrega.dataRetirada || new Date().toLocaleDateString("pt-BR"),
-      colaborador:entrega.colaborador || currentUserProfile.nome,
+      colaborador:entrega.colaborador || colaborador,
       quemRetirou:entrega.quemRetirou || retiradoPor
     };
     entregasLocaisPendentes.set(currentDocIdToUpdate,local);
