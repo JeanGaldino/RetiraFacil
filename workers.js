@@ -525,8 +525,26 @@ async function autorizarExames(request, env) {
   return {perfil};
 }
 async function chamarPlanilha(env, dados) {
-  if (!env.APPS_SCRIPT_WEBAPP_URL || !env.APPS_SCRIPT_SHARED_SECRET)
-    throw new Error("Configure APPS_SCRIPT_WEBAPP_URL e APPS_SCRIPT_SHARED_SECRET.");
+  const ausentes = ["APPS_SCRIPT_WEBAPP_URL", "APPS_SCRIPT_SHARED_SECRET"].filter(nome => !env[nome]);
+  if (ausentes.length) {
+    const error = new Error("Variáveis ausentes no Cloudflare Worker: " + ausentes.join(", "));
+    error.code = "CONFIG_APPS_SCRIPT";
+    error.missing = ausentes;
+    throw error;
+  }
+  let url;
+  try {
+    url = new URL(env.APPS_SCRIPT_WEBAPP_URL);
+  } catch {
+    const error = new Error("APPS_SCRIPT_WEBAPP_URL inválida.");
+    error.code = "CONFIG_APPS_SCRIPT";
+    throw error;
+  }
+  if (url.protocol !== "https:" || url.hostname !== "script.google.com" || !url.pathname.endsWith("/exec")) {
+    const error = new Error("APPS_SCRIPT_WEBAPP_URL deve ser a URL HTTPS de implantação /exec do Google Apps Script.");
+    error.code = "CONFIG_APPS_SCRIPT";
+    throw error;
+  }
   const response = await fetch(env.APPS_SCRIPT_WEBAPP_URL,{
     method:"POST",
     headers:{"Content-Type":"text/plain;charset=utf-8"},
@@ -555,8 +573,11 @@ async function obterExamesCompartilhados(request,env) {
     await env.EXAMS_CACHE.put(EXAMS_CACHE_KEY,JSON.stringify(snapshot),{expirationTtl:300});
     return json({...snapshot,origem:"planilha"});
   } catch(error) {
-    console.error("Erro ao listar exames:",error);
-    return json({error:"Não foi possível consultar a planilha."},503);
+    console.error("Erro ao listar exames:", error);
+    if (error.code === "CONFIG_APPS_SCRIPT") {
+      return json({error:"Configuração da integração com Google Sheets pendente no Cloudflare.",codigo:"CONFIG_APPS_SCRIPT",variaveisAusentes:error.missing || []},503);
+    }
+    return json({error:"Não foi possível consultar a planilha.",codigo:"ERRO_PLANILHA"},503);
   }
 }
 async function entregarExamePlanilha(request,env) {
