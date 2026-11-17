@@ -169,7 +169,7 @@ async function realizarLogin(event) {
     return;
   }
 
-  if (!/^[a-z0-9._-]+$/.test(usuario)) {
+  if (!/^[a-z0-9._-]+$/.test(usuario) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(usuario)) {
     mostrarErroLogin("O nome de usuário contém caracteres inválidos.");
     return;
   }
@@ -191,10 +191,13 @@ async function realizarLogin(event) {
   try {
     // O Firebase Authentication utiliza e-mail/senha.
     // O colaborador digita somente o nome de usuário.
-    const emailInterno =
-      `${usuario}@retirafacil-75fd6.firebaseapp.com`;
-
-    await auth.signInWithEmailAndPassword(emailInterno, senha);
+    const emailInterno = usuario.includes("@") ? usuario : `${usuario}@retirafacil-v2.firebaseapp.com`;
+    try {
+      await auth.signInWithEmailAndPassword(emailInterno, senha);
+    } catch (erro) {
+      if (usuario.includes("@") || !["auth/user-not-found","auth/wrong-password","auth/invalid-credential"].includes(erro.code)) throw erro;
+      await auth.signInWithEmailAndPassword(`${usuario}@retirafacil-75fd6.firebaseapp.com`, senha);
+    }
 
     if (senhaInput) senhaInput.value = "";
 
@@ -1078,7 +1081,8 @@ async function confirmarEntregaAction() {
   }
   entregaEmAndamento = true;
   const botao = document.querySelector('#modal-entrega button[onclick="confirmarEntregaAction()"]');
-  if (botao) botao.disabled = true;
+  const textoBotao = botao?.innerHTML;
+  if (botao) { botao.disabled = true; botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...'; }
   showToast("Registrando retirada na planilha...","info");
   try {
     const token = await auth.currentUser.getIdToken();
@@ -1100,19 +1104,20 @@ async function confirmarEntregaAction() {
       const row=aba.dados.find(r=>r[9]===currentDocIdToUpdate);
       if(row){row[4]=local.dataRetirada;row[6]=local.colaborador;row[8]=local.quemRetirou;}
     }
-    renderTable();
+    entregaEmAndamento = false;
     closeModal();
+    renderTable();
     showToast("Retirada registrada na planilha!","success");
-    void atualizarExamesCompartilhados();
   } catch(error) {
     console.error("Erro ao registrar retirada:",error);
     showToast(error.message,"warning");
     if (/já foi entregue|ja foi entregue/i.test(error.message)) {
+      entregaEmAndamento = false;
       closeModal(); void atualizarExamesCompartilhados();
     }
   } finally {
     entregaEmAndamento=false;
-    if(botao)botao.disabled=false;
+    if(botao){botao.disabled=false; botao.innerHTML=textoBotao;}
   }
 }
 
@@ -1175,6 +1180,7 @@ document.getElementById("admin-password-form")?.addEventListener("submit", async
 // ======================================================
 
 function closeModal() {
+  if (entregaEmAndamento) return;
   const modal = document.getElementById("modal-entrega");
 
   if (modal) modal.classList.add("hidden");

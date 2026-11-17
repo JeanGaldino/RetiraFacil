@@ -4,7 +4,7 @@ Esta funcionalidade requer que o arquivo `workers.js` seja implantado como Cloud
 
 ## Configuração
 
-1. No Cloudflare Worker, configure `FIREBASE_SERVICE_ACCOUNT_JSON` como **Secret**, contendo o JSON completo de uma conta de serviço Firebase/Google Cloud, do projeto `retirafacil-75fd6`. **Nunca** coloque esse JSON no GitHub ou no HTML.
+1. No Cloudflare Worker, configure `FIREBASE_SERVICE_ACCOUNT_JSON` como **Secret**, contendo o JSON completo de uma conta de serviço Firebase/Google Cloud, do projeto `retirafacil-v2`. **Nunca** coloque esse JSON no GitHub ou no HTML.
 2. A conta de serviço precisa de permissões adequadas para administrar usuários do Firebase Authentication e documentos da coleção de usuários no Firestore. Atribua somente as permissões necessárias.
 3. Preserve os bindings `SESSIONS`, `FIREBASE_WEB_API_KEY`, `ADMIN_PASSWORD` e `ASSETS` já previstos no Worker. A senha administrativa deve ficar em `ADMIN_PASSWORD`, não no JavaScript público.
 4. A interface chama `GET /api/admin/users` para listar, `POST /api/admin/users` para cadastrar e `PATCH /api/admin/users/:uid` para ativar/desativar.
@@ -14,6 +14,8 @@ Esta funcionalidade requer que o arquivo `workers.js` seja implantado como Cloud
 
 O `app.js` foi ajustado nesta branch para validar a senha no Worker por meio de `POST /api/admin/verify`, em vez de conferir uma senha escrita no JavaScript público.
 
-O sistema usa internamente e-mail sintético no formato `usuario@retirafacil-75fd6.firebaseapp.com`, embora a tela de login peça apenas o nome de usuário. Senhas jamais devem ser salvas em documentos Firestore.
+O sistema usa internamente e-mail sintético no formato `usuario@retirafacil-v2.firebaseapp.com`, ou e-mail real opcional. Contas com e-mail real entram pelo endereço completo; o login por usuário também tenta o domínio legado para preservar contas antigas. Senhas jamais devem ser salvas em documentos Firestore.
 
 Teste a criação, a ativação, a desativação e a tentativa de acesso por um colaborador sem permissão administrativa antes de publicar em produção. Faça cópia de segurança e valide as regras Firestore atuais.
+
+- Habilite E-mail/senha no Firebase Authentication. Publique nova versão de `Code.gs` no Apps Script para remover a disputa de bloqueio entre leitura e retirada. A gravação continua protegida por lock e confirmada antes de retornar sucesso.

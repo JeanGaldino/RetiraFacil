@@ -8,7 +8,7 @@ const SECURITY_HEADERS = {
 };
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     try {
@@ -40,7 +40,7 @@ export default {
         return await obterExamesCompartilhados(request, env);
       }
       if (url.pathname === "/api/exames/entregar" && request.method === "POST") {
-        return await entregarExamePlanilha(request, env);
+        return await entregarExamePlanilha(request, env, ctx);
       }
 
       if (url.pathname === "/api/admin/verify" && request.method === "POST") {
@@ -149,7 +149,22 @@ function codificarBase64Url(value) {
   for (const byte of bytes) str += String.fromCharCode(byte);
   return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
+let oauthCache = null;
+let oauthPending = null;
 async function accessTokenFirebase(env) {
+  const service = contaServico(env);
+  const identity = service.client_email + ":" + (service.private_key_id || service.private_key);
+  if (oauthCache?.identity === identity && oauthCache.expires > Date.now()) return oauthCache.token;
+  if (oauthPending?.identity === identity) return oauthPending.promise;
+  const promise = emitirTokenFirebase(env).then(data => {
+    const ttl = Math.max(0, Math.min(3300, Number(data.expires_in || 3600) - 60));
+    oauthCache = {identity, token:data.access_token, expires:Date.now()+ttl*1000};
+    return data.access_token;
+  });
+  oauthPending = {identity,promise};
+  try { return await promise; } finally { if (oauthPending?.promise === promise) oauthPending = null; }
+}
+async function emitirTokenFirebase(env) {
   const service = contaServico(env);
   const now = Math.floor(Date.now() / 1000);
   const header = codificarBase64Url(JSON.stringify({alg:'RS256',typ:'JWT'}));
@@ -169,7 +184,7 @@ async function accessTokenFirebase(env) {
   const res = await fetch('https://oauth2.googleapis.com/token', {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion})});
   const data = await res.json();
   if (!res.ok || !data.access_token) throw new Error('Falha na autenticação da conta de serviço.');
-  return data.access_token;
+  return data;
 }
 const FIRESTORE_USERS = 'projects/retirafacil-v2/databases/(default)/documents/artifacts/retira-facil-app/public/data/usuarios';
 async function firebaseRequest(url, token, options = {}) {
@@ -189,6 +204,7 @@ function firestorePerfil(doc) {
     uid:doc.name?.split('/').pop(),
     nome:valor(doc.fields?.nome),
     usuario:valor(doc.fields?.usuario),
+    email:valor(doc.fields?.email),
     tipo:valor(doc.fields?.tipo),
     ativo:valor(doc.fields?.ativo) === true
   };
@@ -266,16 +282,17 @@ async function gerenciarUsuarios(request,env) {
     if(nome.length<3 || nome.length>100 || !/^[a-z0-9._-]{3,40}$/.test(usuario) ||
        typeof senha!=='string' || senha.length<8 || senha.length>128 || !['admin','colaborador'].includes(tipo))
       return json({error:'Informe nome, usuário válido, senha de no mínimo 8 caracteres e permissão.'},400);
-    const email=usuario+'@retirafacil-v2.firebaseapp.com';
+    const email=typeof body.email==='string' && body.email.trim() ? body.email.trim().toLowerCase() : usuario+'@retirafacil-v2.firebaseapp.com';
+    if(email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({error:'Informe um e-mail válido.'},400);
     let created;
     try {
       created=await firebaseRequest('https://identitytoolkit.googleapis.com/v1/projects/retirafacil-v2/accounts',token,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email,password:senha,emailVerified:true,disabled:false,displayName:nome})
+        body:JSON.stringify({email,password:senha,emailVerified:false,disabled:false,displayName:nome})
       });
     } catch(e) {
       if(e.status===400 && /EMAIL_EXISTS|EMAIL_ALREADY_EXISTS/.test(e.message))
-        return json({error:'Este nome de usuário já existe.'},409);
+        return json({error:'Este e-mail já está cadastrado no Firebase.'},409);
       throw e;
     }
     const newUid=created.localId || created.uid;
@@ -284,7 +301,7 @@ async function gerenciarUsuarios(request,env) {
       await firebaseRequest('https://firestore.googleapis.com/v1/'+FIRESTORE_USERS+'/'+encodeURIComponent(newUid),token,{
         method:'PATCH',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({fields:{
-          nome:fieldString(nome),usuario:fieldString(usuario),tipo:fieldString(tipo),
+          nome:fieldString(nome),usuario:fieldString(usuario),email:fieldString(email),tipo:fieldString(tipo),
           ativo:{booleanValue:true},criadoPor:fieldString(adminUid),
           criadoEm:{timestampValue:new Date().toISOString()}
         }})
@@ -298,6 +315,7 @@ async function gerenciarUsuarios(request,env) {
   } catch(error) {
     console.error('Erro no gerenciamento de usuários:',error);
     if(error.status===403)return json({error:'A conta de serviço não tem permissão para gerenciar os usuários.'},503);
+    if(error.status===400 && /INVALID_EMAIL|WEAK_PASSWORD|PASSWORD_DOES_NOT_MEET_REQUIREMENTS/.test(error.message))return json({error:'O Firebase recusou o e-mail ou a senha. Confira os dados e a política de senhas.'},400);
     return json({error:'Não foi possível realizar a operação. Verifique a configuração Firebase.'},500);
   }
 }
@@ -600,7 +618,7 @@ async function obterExamesCompartilhados(request,env) {
     return json({error:"Não foi possível consultar a planilha.",codigo:"ERRO_PLANILHA"},503);
   }
 }
-async function entregarExamePlanilha(request,env) {
+async function entregarExamePlanilha(request,env,ctx) {
   if (!env.EXAMS_CACHE) return json({error:"Configure o binding EXAMS_CACHE."},503);
   if (!isSameOrigin(request)) return json({error:"Origem não autorizada."},403);
   if (!(request.headers.get("Content-Type")||"").includes("application/json"))
@@ -618,8 +636,8 @@ async function entregarExamePlanilha(request,env) {
       acao:"entregar",paciente:body.paciente.trim(),aba:body.aba,
       colaborador:body.colaborador.trim(),retiradoPor:body.retiradoPor.trim()
     });
-    try { await env.EXAMS_CACHE.delete(EXAMS_CACHE_KEY); }
-    catch(error) {console.error("Falha ao invalidar KV:",error);}
+    const invalidar = env.EXAMS_CACHE.delete(EXAMS_CACHE_KEY).catch(error => console.error("Falha ao invalidar KV:",error));
+    if (ctx?.waitUntil) ctx.waitUntil(invalidar); else await invalidar;
     return json({success:true,entrega:result.entrega});
   } catch(error) {
     console.error("Erro ao entregar exame:",error);

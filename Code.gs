@@ -48,7 +48,7 @@ function rfBloqueio(fn) {
   try{return fn();}finally{lock.releaseLock();}
 }
 function rfListar() {
-  const resultado=rfBloqueio(function(){
+  const resultado=(function(){
     const exames=[];
     for(const aba of rfPlanilha().getSheets()){
       const last=aba.getLastRow();
@@ -68,7 +68,7 @@ function rfListar() {
       }
     }
     return {sucesso:true,exames};
-  });
+  })();
   if(!resultado.sucesso)throw new Error("Planilha ocupada.");
   return resultado.exames;
 }
