@@ -116,15 +116,9 @@ async function verifyAdminPassword(request, env) {
   const password = body?.password;
   if (typeof password !== "string" || password.length > 256 || !password.length)
     return json({error:"Senha inválida."}, 400);
-  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-  const rateKey = "admin-attempts:" + ip + ":" + uid;
-  const attempts = Number(await env.SESSIONS.get(rateKey) || 0);
-  if (attempts >= 5) return json({error:"Muitas tentativas. Tente novamente em alguns minutos."}, 429);
   if (!constantTimeEqual(password, env.ADMIN_PASSWORD)) {
-    await env.SESSIONS.put(rateKey, String(attempts + 1), {expirationTtl:600});
     return json({error:"Senha administrativa incorreta."}, 401);
   }
-  await env.SESSIONS.delete(rateKey);
   const ticket = randomToken();
   await env.SESSIONS.put("admin-session:"+ticket, uid, {expirationTtl:ADMIN_SESSION_DURATION});
   return json({success:true}, 200, {"Set-Cookie":ADMIN_COOKIE+"="+ticket+"; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age="+ADMIN_SESSION_DURATION});
