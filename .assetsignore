@@ -16,3 +16,5 @@ package-lock.json
 *service-account*
 *service_account*
 *.json
+
+Code.gs

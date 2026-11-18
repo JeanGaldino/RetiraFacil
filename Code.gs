@@ -38,8 +38,10 @@ function rfNome(v) {
   return rfTexto(v).replace(/\s+/g," ").toLocaleLowerCase("pt-BR");
 }
 function rfPlanilha() {
-  const ss=SpreadsheetApp.getActiveSpreadsheet();
-  if(!ss)throw new Error("Planilha vinculada indisponível.");
+  // Web apps não devem depender do contexto de uma planilha aberta.
+  const id=PropertiesService.getScriptProperties().getProperty("RF_SPREADSHEET_ID");
+  const ss=id?SpreadsheetApp.openById(id.trim()):SpreadsheetApp.getActiveSpreadsheet();
+  if(!ss)throw new Error("Configure RF_SPREADSHEET_ID nas propriedades do script.");
   return ss;
 }
 function rfBloqueio(fn) {
@@ -58,7 +60,7 @@ function rfListar() {
         const r=rows[i],paciente=rfTexto(r[0]);
         if(!paciente || rfNome(paciente)==="nome do paciente")continue;
         exames.push({
-          // Identificador visual estável para a interface; a entrega é por nome + aba.
+          // Identifica a linha exibida. A retirada também confere nome, exame e duplicidade.
           id:aba.getSheetId()+"_"+(i+2),
           paciente,exame:rfTexto(r[1]),
           dataRetirada:rfTexto(r[4]),colaborador:rfTexto(r[6]),
@@ -81,16 +83,35 @@ function rfEntregar(data) {
   return rfBloqueio(function(){
     const aba=rfPlanilha().getSheetByName(abaNome);
     if(!aba || aba.getLastRow()<2)return {sucesso:false,codigo:"NAO_ENCONTRADO"};
+    const id=rfTexto(data.id), exame=rfTexto(data.exame);
     const rows=aba.getRange(2,1,aba.getLastRow()-1,9).getValues();
     const encontrados=[];
     for(let i=0;i<rows.length;i++)
       if(rfNome(rows[i][0])===rfNome(paciente))encontrados.push({linha:i+2,row:rows[i]});
     if(encontrados.length===0)return {sucesso:false,codigo:"NAO_ENCONTRADO"};
-    // Não escolhe arbitrariamente entre homônimos, mesmo que um esteja entregue.
-    if(encontrados.length!==1)return {sucesso:false,codigo:"AMBIGUO"};
-    const {linha,row}=encontrados[0];
-    if(rfTexto(row[4]) || rfTexto(row[6]) || rfTexto(row[8]))
-      return {sucesso:false,codigo:"JA_ENTREGUE"};
+    let registro;
+    if(id){
+      const partes=/^(\d+)_(\d+)$/.exec(id);
+      if(!partes || Number(partes[1])!==aba.getSheetId())
+        return {sucesso:false,codigo:"REGISTRO_ALTERADO"};
+      registro=encontrados.find(item=>item.linha===Number(partes[2]));
+      if(!registro || rfTexto(registro.row[1])!==exame)
+        return {sucesso:false,codigo:"REGISTRO_ALTERADO"};
+      // Dois registros indistinguíveis pelo nome e exame não permitem confirmar
+      // qual paciente é o correto, principalmente se uma linha foi movida.
+      if(encontrados.filter(item=>rfTexto(item.row[1])===exame).length!==1)
+        return {sucesso:false,codigo:"AMBIGUO"};
+    }else{
+      // Compatibilidade temporária com clientes anteriores.
+      if(encontrados.length!==1)return {sucesso:false,codigo:"AMBIGUO"};
+      registro=encontrados[0];
+    }
+    const {linha,row}=registro;
+    const atual={id:aba.getSheetId()+"_"+linha,aba:abaNome,dataRetirada:rfTexto(row[4]),colaborador:rfTexto(row[6]),quemRetirou:rfTexto(row[8])};
+    if(atual.dataRetirada && atual.colaborador && atual.quemRetirou)
+      return {sucesso:false,codigo:"JA_ENTREGUE",entrega:atual};
+    if(atual.dataRetirada || atual.colaborador || atual.quemRetirou)
+      return {sucesso:false,codigo:"REGISTRO_PARCIAL"};
     const now=new Date();
     const dataRetirada=Utilities.formatDate(now,RF_TZ,"dd/MM/yyyy");
     const hora=Utilities.formatDate(now,RF_TZ,"HH:mm");
@@ -101,6 +122,10 @@ function rfEntregar(data) {
     aba.getRange(linha,7).setValue(seguro(assinatura));
     aba.getRange(linha,9).setValue(seguro(retiradoPor));
     SpreadsheetApp.flush();
-    return {sucesso:true,entrega:{aba:abaNome,dataRetirada,colaborador:assinatura,quemRetirou:retiradoPor}};
+    const gravado=aba.getRange(linha,5,1,5).getValues()[0];
+    const entrega={id:aba.getSheetId()+"_"+linha,aba:abaNome,dataRetirada:rfTexto(gravado[0]),colaborador:rfTexto(gravado[2]),quemRetirou:rfTexto(gravado[4])};
+    if(entrega.dataRetirada!==dataRetirada || entrega.colaborador!==assinatura || entrega.quemRetirou!==retiradoPor)
+      return {sucesso:false,codigo:"GRAVACAO_NAO_CONFIRMADA"};
+    return {sucesso:true,entrega};
   });
 }

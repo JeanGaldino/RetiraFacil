@@ -589,6 +589,7 @@ async function chamarPlanilha(env, dados) {
     const error = new Error("Apps Script não confirmou a operação.");
     error.code = "APPS_SCRIPT_REJEITOU";
     error.scriptCode = typeof result?.codigo === "string" && /^[A-Z_]{2,40}$/.test(result.codigo) ? result.codigo : null;
+    if (error.scriptCode === "JA_ENTREGUE") error.entrega = result.entrega;
     console.error("Apps Script rejeitou operação:",{codigo:error.scriptCode,acao:dados.acao});
     throw error;
   }
@@ -599,12 +600,19 @@ async function obterExamesCompartilhados(request,env) {
   try {
     const access = await autorizarExames(request,env);
     if (access.error) return access.error;
-    const cached = await env.EXAMS_CACHE.get(EXAMS_CACHE_KEY,"json");
+    const cached = await env.EXAMS_CACHE.get(EXAMS_CACHE_KEY,"json").catch(error => {
+      console.error("Falha ao consultar cache de exames:",error);
+      return null;
+    });
     if (cached && Array.isArray(cached.exames)) return json({...cached,origem:"cache"});
     const result = await chamarPlanilha(env,{acao:"listar"});
     if (!Array.isArray(result.exames)) throw new Error("Resposta inválida.");
     const snapshot={exames:result.exames,atualizadoEm:new Date().toISOString()};
-    await env.EXAMS_CACHE.put(EXAMS_CACHE_KEY,JSON.stringify(snapshot),{expirationTtl:300});
+    try {
+      await env.EXAMS_CACHE.put(EXAMS_CACHE_KEY,JSON.stringify(snapshot),{expirationTtl:60});
+    } catch(error) {
+      console.error("Falha ao atualizar cache de exames:",error);
+    }
     return json({...snapshot,origem:"planilha"});
   } catch(error) {
     console.error("Erro ao listar exames:", error);
@@ -627,25 +635,39 @@ async function entregarExamePlanilha(request,env,ctx) {
     const access = await autorizarExames(request,env);
     if (access.error) return access.error;
     const body=await request.json().catch(()=>null);
-    if (!body || typeof body.paciente!=="string" || !body.paciente.trim() || body.paciente.length>200 ||
+    if (!body || (body.id !== undefined && (typeof body.id !== "string" || !/^\d+_\d+$/.test(body.id) || typeof body.exame !== "string" || body.exame.length > 1000)) ||
+        typeof body.paciente!=="string" || !body.paciente.trim() || body.paciente.length>200 ||
         typeof body.aba!=="string" || !body.aba || body.aba.length>120 ||
         typeof body.retiradoPor!=="string" || !body.retiradoPor.trim() || body.retiradoPor.length>150 ||
         typeof body.colaborador!=="string" || !body.colaborador.trim() || body.colaborador.length>150)
       return json({error:"Dados de retirada inválidos."},400);
     const result=await chamarPlanilha(env,{
       acao:"entregar",paciente:body.paciente.trim(),aba:body.aba,
+      id:body.id,exame:body.exame,
       colaborador:body.colaborador.trim(),retiradoPor:body.retiradoPor.trim()
     });
-    const invalidar = env.EXAMS_CACHE.delete(EXAMS_CACHE_KEY).catch(error => console.error("Falha ao invalidar KV:",error));
-    if (ctx?.waitUntil) ctx.waitUntil(invalidar); else await invalidar;
-    return json({success:true,entrega:result.entrega});
+    const entrega=result.entrega;
+    await env.EXAMS_CACHE.delete(EXAMS_CACHE_KEY).catch(error => console.error("Falha ao invalidar KV:",error));
+    if (!entrega?.dataRetirada || !entrega?.colaborador || !entrega?.quemRetirou ||
+        entrega.aba !== body.aba || (entrega.id && body.id && entrega.id !== body.id))
+      return json({error:"O Apps Script não confirmou os campos da retirada. Confira a planilha antes de repetir.",codigo:"GRAVACAO_NAO_CONFIRMADA"},503);
+    return json({success:true,entrega});
   } catch(error) {
     console.error("Erro ao entregar exame:",error);
     if(error.code==="JA_ENTREGUE")return json({error:"Este exame já foi entregue."},409);
     if(error.code==="NAO_ENCONTRADO")return json({error:"Exame não encontrado."},404);
     if(error.code==="APPS_SCRIPT_REJEITOU") {
       const codigoScript=error.scriptCode;
-      if(codigoScript==="JA_ENTREGUE") return json({error:"Este exame já consta como entregue na planilha.",codigo:"JA_ENTREGUE"},409);
+      if(["JA_ENTREGUE","REGISTRO_ALTERADO","REGISTRO_PARCIAL","GRAVACAO_NAO_CONFIRMADA"].includes(codigoScript))
+        await env.EXAMS_CACHE.delete(EXAMS_CACHE_KEY).catch(err=>console.error("Falha ao invalidar KV:",err));
+      if(codigoScript==="JA_ENTREGUE") return json({error:"Este exame já consta como entregue na planilha.",codigo:"JA_ENTREGUE",entrega:error.entrega},409);
+      if(codigoScript==="NAO_AUTORIZADO") return json({error:"O segredo do Apps Script não corresponde ao segredo do Cloudflare. Avise o administrador.",codigo:"NAO_AUTORIZADO"},503);
+      if(codigoScript==="ACAO_INVALIDA") return json({error:"A implantação do Apps Script não reconhece a retirada. Atualize a versão publicada.",codigo:codigoScript},503);
+      if(codigoScript==="OCUPADO") return json({error:"Planilha ocupada. Aguarde alguns segundos e tente novamente.",codigo:codigoScript},503);
+      if(codigoScript==="REGISTRO_ALTERADO") return json({error:"A linha do exame mudou. Atualize a busca e confira o registro.",codigo:codigoScript},409);
+      if(codigoScript==="REGISTRO_PARCIAL") return json({error:"Há campos de retirada preenchidos parcialmente. Confira a linha na planilha antes de repetir.",codigo:codigoScript},409);
+      if(codigoScript==="GRAVACAO_NAO_CONFIRMADA") return json({error:"A gravação não pôde ser confirmada. Confira a planilha antes de repetir.",codigo:codigoScript},503);
+      if(codigoScript==="ERRO_INTERNO") return json({error:"Erro interno do Apps Script. Verifique as execuções, as permissões e RF_SPREADSHEET_ID.",codigo:codigoScript},503);
       if(codigoScript==="NAO_ENCONTRADO") return json({error:"O Apps Script não encontrou o nome do paciente na aba informada.",codigo:"NAO_ENCONTRADO"},404);
       if(codigoScript==="AMBIGUO") return json({error:"Existem registros com o mesmo nome nesta aba. Confirme a linha na planilha antes de registrar.",codigo:"AMBIGUO"},409);
       if(codigoScript==="INVALIDO") return json({error:"Os dados enviados para retirada são inválidos.",codigo:"INVALIDO"},400);
@@ -653,7 +675,8 @@ async function entregarExamePlanilha(request,env,ctx) {
     }
     if(error.code==="CONFIG_APPS_SCRIPT")return json({error:"Configuração da integração com Google Sheets pendente no Cloudflare.",codigo:"CONFIG_APPS_SCRIPT",variaveisAusentes:error.missing || []},503);
     if(typeof error.message==="string" && /^Apps Script HTTP [0-9]{3}$/.test(error.message))return json({error:"O Google Apps Script recusou a solicitação de retirada.",codigo:"APPS_SCRIPT_HTTP",statusAppsScript:Number(error.message.slice(-3))},503);
-    if(error instanceof SyntaxError)return json({error:"O Google Apps Script retornou uma resposta que não é JSON.",codigo:"APPS_SCRIPT_RESPOSTA_INVALIDA"},503);
+    if(error.code==="APPS_SCRIPT_RESPOSTA_INVALIDA" || error instanceof SyntaxError)return json({error:"O Google Apps Script não retornou JSON. Verifique a URL /exec, a versão e as permissões da implantação.",codigo:"APPS_SCRIPT_RESPOSTA_INVALIDA"},503);
+    if(error.code==="APPS_SCRIPT_REDE")return json({error:"Falha de conexão com o Google Apps Script. Confira a planilha antes de repetir.",codigo:error.code},503);
     return json({error:"Não foi possível registrar retirada.",codigo:typeof error.code==="string" && /^[A-Z_]{2,40}$/.test(error.code)?error.code:"ERRO_ENTREGA"},503);
   }
 }

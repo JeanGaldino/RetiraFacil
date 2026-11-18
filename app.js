@@ -14,9 +14,7 @@ const firebaseConfig = {
   measurementId: "G-4FVMXVH1DJ"
 };
 
-// URL de envio para a planilha Google Sheets
-const APPS_SCRIPT_WEBAPP_URL =
-  "https://script.google.com/macros/s/AKfycbwIORD0w7FPGt1ShtPrnos3iCj2oNc6fT1B3u-8fmcZ1FGVdzo29_Cnx_47CCqQKSQVsg/exec";
+// A integração com Google Sheets é exclusivamente pelo Worker autenticado.
 
 // Caminhos do Firestore
 const FIRESTORE_APP_ID = "retira-facil-app";
@@ -41,6 +39,7 @@ let unsubscribeAvisos = null;
 let avisoAtualId = null;
 let currentDocIdToUpdate = "";
 let currentAbaNomeToUpdate = "";
+let currentExameToUpdate = "";
 
 
 // ======================================================
@@ -507,8 +506,9 @@ async function atualizarExamesCompartilhados(generation = examesSyncGeneration) 
       const id = String(item.id || "");
       const local = entregasLocaisPendentes.get(id);
       if (local) {
-        if (item.dataRetirada || item.colaborador) entregasLocaisPendentes.delete(id);
-        else Object.assign(item, local);
+        if (item.dataRetirada === local.dataRetirada && item.colaborador === local.colaborador && item.quemRetirou === local.quemRetirou) entregasLocaisPendentes.delete(id);
+        else if (!item.dataRetirada && !item.colaborador && !item.quemRetirou) Object.assign(item, local);
+        else entregasLocaisPendentes.delete(id);
       }
       const nomeAba = item.abaOrigem || item.aba || "Exames Geral";
       if (!agrupados[nomeAba]) agrupados[nomeAba] = {aba:nomeAba,dados:[]};
@@ -741,7 +741,7 @@ function updateDashboardStats() {
       const dataRetirada = String(row[4] ?? "").trim();
       const assinatura = String(row[6] ?? "").trim();
 
-      if (dataRetirada || assinatura) entregues++;
+      if (dataRetirada || assinatura || String(row[8] ?? "").trim()) entregues++;
     });
   });
 
@@ -849,7 +849,7 @@ function renderTable() {
       }
 
       const isEntregue =
-        !!dataRetirada || !!colaborador;
+        !!dataRetirada || !!colaborador || !!quemRetirou;
       const filtroStatus = document.getElementById("status-filter")?.value || "todos";
       if (filtroStatus === "entregues" && !isEntregue) return;
       if (filtroStatus === "pendentes" && isEntregue) return;
@@ -857,7 +857,7 @@ function renderTable() {
       count++;
 
       const pacienteEncoded =
-        encodeURIComponent(paciente);
+        encodeURIComponent(paciente).replace(/'/g, "%27");
 
       let detalheExameOuAba = "";
 
@@ -932,81 +932,6 @@ function renderTable() {
 
 
 // ======================================================
-// ENVIO PARA A PLANILHA VIA JSONP
-// ======================================================
-
-function enviarParaPlanilha(dados) {
-  return new Promise((resolve, reject) => {
-    const callbackName =
-      "retiraFacil_" +
-      Date.now() +
-      "_" +
-      Math.random().toString(36).substring(2, 8);
-
-    const params = new URLSearchParams({
-      acao: "entregar",
-      aba: dados.aba,
-      paciente: dados.paciente,
-      dataEntrega: dados.dataEntrega,
-      colaborador: dados.colaborador,
-      retiradoPor: dados.retiradoPor,
-      callback: callbackName
-    });
-
-    const script = document.createElement("script");
-    let finalizado = false;
-
-    function limpar() {
-      if (finalizado) return;
-
-      finalizado = true;
-      clearTimeout(timeout);
-      delete window[callbackName];
-      script.remove();
-    }
-
-    const timeout = setTimeout(() => {
-      limpar();
-      reject(
-        new Error(
-          "Tempo esgotado aguardando confirmação da planilha."
-        )
-      );
-    }, 20000);
-
-    window[callbackName] = (resposta) => {
-      limpar();
-
-      if (resposta && resposta.sucesso) {
-        resolve(resposta);
-      } else {
-        reject(
-          new Error(
-            resposta?.mensagem ||
-            "O Apps Script não confirmou a gravação."
-          )
-        );
-      }
-    };
-
-    script.onerror = () => {
-      limpar();
-      reject(
-        new Error(
-          "Não foi possível acessar o Google Apps Script."
-        )
-      );
-    };
-
-    script.src =
-      APPS_SCRIPT_WEBAPP_URL + "?" + params.toString();
-
-    document.head.appendChild(script);
-  });
-}
-
-
-// ======================================================
 // MODAL DE ENTREGA
 // ======================================================
 
@@ -1020,8 +945,19 @@ function openEntregaModal(
     return;
   }
 
+  if (entregaEmAndamento) return;
   const paciente = decodeURIComponent(pacienteEncoded);
-
+  const abaSelecionada = sheetsData[especificAbaIdx];
+  const registro = abaSelecionada?.dados.find(r => String(r[9]) === String(docId));
+  if (!registro || String(registro[0]).trim() !== paciente || !/^\d+_\d+$/.test(String(docId))) {
+    showToast("Registro desatualizado. Atualize os exames e tente novamente.", "warning");
+    return;
+  }
+  if (registro[4] || registro[6] || registro[8]) {
+    showToast("Este registro já possui dados de retirada. Confira a planilha.", "warning");
+    return;
+  }
+  currentExameToUpdate = String(registro[1] ?? "");
   currentEditingPaciente = paciente;
   currentDocIdToUpdate = docId;
 
@@ -1076,7 +1012,7 @@ async function confirmarEntregaAction() {
   if (!currentUser || !currentUserProfile || currentUserProfile.ativo !== true) {
     showToast("Sua sessão não está autorizada.","warning"); return;
   }
-  if (!currentEditingPaciente || !retiradoPor || !colaborador || colaborador.length > 150 || !currentAbaNomeToUpdate) {
+  if (!currentEditingPaciente || !retiradoPor || retiradoPor.length > 150 || !colaborador || colaborador.length > 150 || !currentAbaNomeToUpdate || !currentDocIdToUpdate) {
     showToast("Informe quem retirou, o nome do colaborador e selecione um exame válido.","warning"); return;
   }
   entregaEmAndamento = true;
@@ -1089,15 +1025,27 @@ async function confirmarEntregaAction() {
     const response = await fetch("/api/exames/entregar",{
       method:"POST",credentials:"same-origin",cache:"no-store",
       headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-      body:JSON.stringify({paciente:currentEditingPaciente,aba:currentAbaNomeToUpdate,retiradoPor,colaborador})
+      body:JSON.stringify({id:currentDocIdToUpdate,exame:currentExameToUpdate,paciente:currentEditingPaciente,aba:currentAbaNomeToUpdate,retiradoPor,colaborador})
     });
     const result = await response.json().catch(()=>({}));
-    if (!response.ok || !result.success) throw new Error(result.error || "Falha ao salvar retirada.");
-    const entrega = result.entrega || {};
+    const jaEntregue = response.status === 409 && result.codigo === "JA_ENTREGUE";
+    const entrega = result.entrega;
+    if ((!response.ok || result.success !== true) && !jaEntregue) {
+      const codigo = result.codigoScript || result.codigo;
+      const erro = new Error((result.error || "Falha ao salvar retirada.") + (codigo ? " (" + codigo + ")" : ""));
+      erro.codigo = codigo;
+      throw erro;
+    }
+    if (!entrega?.dataRetirada || !entrega?.colaborador || !entrega?.quemRetirou ||
+        entrega.aba !== currentAbaNomeToUpdate || (entrega.id && entrega.id !== currentDocIdToUpdate)) {
+      const erro = new Error("Não foi possível confirmar os dados da retirada. Confira a planilha antes de repetir.");
+      erro.codigo = jaEntregue ? "JA_ENTREGUE" : "GRAVACAO_NAO_CONFIRMADA";
+      throw erro;
+    }
     const local = {
-      dataRetirada:entrega.dataRetirada || new Date().toLocaleDateString("pt-BR"),
-      colaborador:entrega.colaborador || colaborador,
-      quemRetirou:entrega.quemRetirou || retiradoPor
+      dataRetirada:entrega.dataRetirada,
+      colaborador:entrega.colaborador,
+      quemRetirou:entrega.quemRetirou
     };
     entregasLocaisPendentes.set(currentDocIdToUpdate,local);
     for (const aba of sheetsData) {
@@ -1107,11 +1055,11 @@ async function confirmarEntregaAction() {
     entregaEmAndamento = false;
     closeModal();
     renderTable();
-    showToast("Retirada registrada na planilha!","success");
+    showToast(jaEntregue ? "Este exame já constava como entregue na planilha." : "Retirada registrada na planilha!",jaEntregue ? "warning" : "success");
   } catch(error) {
     console.error("Erro ao registrar retirada:",error);
     showToast(error.message,"warning");
-    if (/já foi entregue|ja foi entregue/i.test(error.message)) {
+    if (["JA_ENTREGUE","REGISTRO_ALTERADO","REGISTRO_PARCIAL","GRAVACAO_NAO_CONFIRMADA"].includes(error.codigo)) {
       entregaEmAndamento = false;
       closeModal(); void atualizarExamesCompartilhados();
     }
