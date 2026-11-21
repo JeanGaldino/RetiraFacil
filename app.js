@@ -37,6 +37,10 @@ let entregaEmAndamento = false;
 const entregasLocaisPendentes = new Map();
 let unsubscribeAvisos = null;
 let avisoAtualId = null;
+let avisosPendentes = [];
+let avisosEmModal = [];
+let avisoModalAtivo = null;
+let avisosLidos = new Set();
 let currentDocIdToUpdate = "";
 let currentAbaNomeToUpdate = "";
 let currentExameToUpdate = "";
@@ -410,6 +414,8 @@ function encerrarSessaoVisual() {
   if (typeof unsubscribeAvisos === "function") unsubscribeAvisos();
   unsubscribeAvisos = null;
   avisoAtualId = null;
+  avisoModalAtivo = null; avisosPendentes = []; avisosEmModal = []; avisosLidos = new Set();
+  document.getElementById("avisos-list")?.classList.add("hidden");
   const avisoModal = document.getElementById("announcement-alert");
   avisoModal?.classList.add("hidden");
   avisoModal?.classList.remove("flex");
@@ -1191,28 +1197,61 @@ function showToast(message, type = "info") {
 function iniciarEscutaAvisos() {
   if (!db || !currentUser) return;
   if (typeof unsubscribeAvisos === "function") unsubscribeAvisos();
-  unsubscribeAvisos = db.collection("artifacts").doc("retira-facil-app")
-    .collection("public").doc("data").collection("avisos").doc("atual")
-    .onSnapshot(snapshot => {
-      if (!snapshot.exists || !currentUser) return;
-      const aviso = snapshot.data();
-      if (!aviso || !aviso.id || typeof aviso.mensagem !== "string") return;
-      const chave = "retirafacil_aviso_lido_" + currentUser.uid;
-      try { if (localStorage.getItem(chave) === aviso.id) return; } catch (_) {}
-      avisoAtualId = aviso.id;
-      const modal = document.getElementById("announcement-alert");
-      const mensagem = document.getElementById("announcement-alert-message");
-      if (!modal || !mensagem) return;
-      mensagem.textContent = aviso.mensagem;
-      modal.classList.remove("hidden");
-      modal.classList.add("flex");
-    }, error => console.error("Falha ao receber aviso:", error));
+  const uid = currentUser.uid;
+  const base = db.collection("artifacts").doc("retira-facil-app").collection("public").doc("data");
+  const chave = "retirafacil_avisos_lidos_" + uid;
+  try { avisosLidos = new Set(JSON.parse(localStorage.getItem(chave) || "[]")); } catch (_) { avisosLidos = new Set(); }
+  unsubscribeAvisos = base.collection("avisos").onSnapshot(snapshot => {
+    if (currentUser?.uid !== uid) return;
+    const now = Date.now();
+    const avisos = snapshot.docs.map(d => ({...d.data(), id:d.id})).filter(a => a.ativo !== false && a.mensagem && (!a.expiraEm || (a.expiraEm.toMillis ? a.expiraEm.toMillis() : Date.parse(a.expiraEm)) > now));
+    // Documento legado 'atual': permanece compatível, sem duplicar a leitura.
+    avisosPendentes = avisos.filter(a => !avisosLidos.has(a.id)).sort((a,b) => (b.criadoEm?.toMillis?.() || 0) - (a.criadoEm?.toMillis?.() || 0));
+    avisosEmModal = avisosPendentes.filter(a => a.categoria === "urgente" || a.leituraObrigatoria === true || a.id === "atual");
+    renderizarSininho();
+    mostrarProximoAviso();
+  }, error => console.error("Falha ao receber avisos:", error));
 }
-document.getElementById("announcement-alert-confirm")?.addEventListener("click", () => {
-  if (currentUser && avisoAtualId) {
-    try { localStorage.setItem("retirafacil_aviso_lido_" + currentUser.uid, avisoAtualId); } catch (_) {}
+function renderizarSininho() {
+  const lista = document.getElementById("avisos-list"), contador = document.getElementById("avisos-count");
+  if (!lista || !contador) return;
+  const informativos = avisosPendentes.filter(a => !avisosEmModal.some(m => m.id === a.id));
+  contador.textContent = String(informativos.length);
+  contador.classList.toggle("hidden", informativos.length === 0);
+  lista.replaceChildren();
+  if (!informativos.length) { const p=document.createElement("p"); p.textContent="Nenhum aviso novo."; p.className="text-sm text-slate-500"; lista.appendChild(p); }
+  informativos.forEach(a => {
+    const item=document.createElement("div"); item.className="border-b dark:border-slate-700 py-3";
+    const title=document.createElement("strong"); title.className="block text-sm"; title.textContent=a.titulo || "Comunicado";
+    const msg=document.createElement("p"); msg.className="text-sm whitespace-pre-wrap my-2"; msg.textContent=a.mensagem;
+    const btn=document.createElement("button"); btn.className="text-xs text-cyan-600 font-semibold"; btn.textContent="Marcar como lido"; btn.onclick=()=>confirmarAviso(a.id);
+    item.append(title,msg,btn); lista.appendChild(item);
+  });
+}
+function mostrarProximoAviso() {
+  if (avisoModalAtivo || !avisosEmModal.length) return;
+  avisoModalAtivo = avisosEmModal[0];
+  avisoAtualId = avisoModalAtivo.id;
+  const modal=document.getElementById("announcement-alert");
+  document.getElementById("announcement-alert-title").textContent=avisoModalAtivo.titulo || "Comunicado da administração";
+  document.getElementById("announcement-alert-message").textContent=avisoModalAtivo.mensagem;
+  modal?.classList.remove("hidden"); modal?.classList.add("flex");
+}
+function confirmarAviso(id) {
+  if (!currentUser) return;
+  avisosLidos.add(id);
+  try { localStorage.setItem("retirafacil_avisos_lidos_" + currentUser.uid, JSON.stringify([...avisosLidos])); } catch (_) {}
+  avisosPendentes=avisosPendentes.filter(a=>a.id!==id);
+  avisosEmModal=avisosEmModal.filter(a=>a.id!==id);
+  if (avisoModalAtivo?.id === id) {
+    avisoModalAtivo=null; avisoAtualId=null;
+    const modal=document.getElementById("announcement-alert");
+    modal?.classList.add("hidden"); modal?.classList.remove("flex");
   }
-  const modal = document.getElementById("announcement-alert");
-  modal?.classList.add("hidden");
-  modal?.classList.remove("flex");
+  renderizarSininho(); mostrarProximoAviso();
+}
+document.getElementById("announcement-alert-confirm")?.addEventListener("click", () => { if(avisoAtualId) confirmarAviso(avisoAtualId); });
+document.getElementById("avisos-bell")?.addEventListener("click", () => {
+  const lista=document.getElementById("avisos-list"), botao=document.getElementById("avisos-bell");
+  lista?.classList.toggle("hidden"); botao?.setAttribute("aria-expanded", String(!lista?.classList.contains("hidden")));
 });
