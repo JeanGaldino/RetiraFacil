@@ -185,6 +185,11 @@
             <span class="hidden sm:inline">Guia</span>
           </button>
 
+          <!-- Central de avisos -->
+          <div class="relative">
+            <button id="avisos-bell" type="button" class="relative p-2 bg-slate-100 dark:bg-slate-800 rounded-lg" aria-label="Abrir avisos" aria-expanded="false"><i class="fas fa-bell"></i><span id="avisos-count" class="hidden absolute -top-1 -right-1 rounded-full bg-red-600 text-white text-[10px] px-1.5">0</span></button>
+            <div id="avisos-list" class="hidden absolute right-0 top-full mt-2 w-80 max-w-[90vw] max-h-96 overflow-auto bg-white dark:bg-slate-900 border dark:border-slate-700 rounded-xl shadow-xl p-3 z-50" aria-label="Avisos informativos"></div>
+          </div>
           <!-- Alternador Modo Escuro -->
           <button id="btn-theme-toggle" onclick="toggleTheme()" class="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs transition" title="Alternar tema">
             <i id="theme-toggle-icon" class="fas fa-moon"></i>
@@ -436,6 +441,6 @@
   </div>
 
   <!-- LÓGICA JAVASCRIPT SEPARADA -->
-  <script src="app.js?v=20261118-1"></script>
+  <script src="app.js?v=20261121-avisos"></script>
 </body>
 </html>
