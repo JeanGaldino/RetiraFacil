@@ -51,6 +51,9 @@
     <form id="announcement-form" class="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl space-y-4">
       <h2 id="announcement-editor-title" class="text-xl font-bold">Emitir mensagem aos usuários</h2>
       <p class="text-sm text-slate-500 dark:text-slate-400">O aviso será exibido para os usuários conectados e para quem entrar depois.</p>
+      <label for="announcement-title" class="block text-sm font-semibold">Título</label><input id="announcement-title" maxlength="120" required class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3" placeholder="Título do comunicado">
+      <label for="announcement-category" class="block text-sm font-semibold">Tipo do aviso</label><select id="announcement-category" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3"><option value="informativo">Informativo (sininho)</option><option value="importante">Importante (sininho)</option><option value="urgente">Urgente (modal)</option></select>
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="announcement-required"> Exigir confirmação em modal</label>
       <label for="announcement-text" class="block text-sm font-semibold">Mensagem</label>
       <textarea id="announcement-text" required maxlength="1000" rows="5" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3" placeholder="Digite o comunicado..."></textarea>
       <p id="announcement-feedback" class="text-sm" role="status"></p>
@@ -234,13 +237,16 @@
       enviar.disabled = true;
       $('announcement-feedback').textContent = 'Enviando aviso...';
       try {
-        await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'avisos', 'atual'), {
+        await setDoc(doc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'avisos')), {
+          titulo: clean($('announcement-title').value).slice(0,120),
           mensagem,
-          id: crypto.randomUUID(),
+          categoria: $('announcement-category').value,
+          leituraObrigatoria: $('announcement-required').checked,
+          ativo: true,
           criadoEm: serverTimestamp(),
           criadoPor: auth.currentUser.uid
         });
-        $('announcement-text').value = '';
+        $('announcement-text').value = ''; $('announcement-title').value = ''; $('announcement-required').checked = false;
         fecharEditor();
       } catch (erro) {
         console.error('Erro ao enviar aviso:', erro);
