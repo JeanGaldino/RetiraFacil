@@ -498,40 +498,55 @@ async function atualizarExamesCompartilhados(generation = examesSyncGeneration) 
   try {
     const user = auth.currentUser;
     const token = await user.getIdToken();
-    const response = await fetch("/api/exames", {
-      method: "GET", headers: {Authorization:"Bearer "+token},
-      credentials: "same-origin", cache: "no-store"
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || "Falha ao carregar exames.");
-    if (!Array.isArray(payload.exames)) throw new Error("Resposta de exames inválida.");
-    if (generation !== examesSyncGeneration || auth.currentUser?.uid !== user.uid) return;
+    let cursor = "";
+    let concluido = false;
+    let totalAbas = 0;
+    let abasProcessadas = 0;
+    let requisicoes = 0;
     const agrupados = {};
-    for (const original of payload.exames) {
-      const item = {...original};
-      const id = String(item.id || "");
-      const local = entregasLocaisPendentes.get(id);
-      if (local) {
-        if (item.dataRetirada === local.dataRetirada && item.colaborador === local.colaborador && item.quemRetirou === local.quemRetirou) entregasLocaisPendentes.delete(id);
-        else if (!item.dataRetirada && !item.colaborador && !item.quemRetirou) Object.assign(item, local);
-        else entregasLocaisPendentes.delete(id);
+    const idsRecebidos = new Set();
+    while (!concluido) {
+      if (generation !== examesSyncGeneration || auth.currentUser?.uid !== user.uid) return;
+      if (++requisicoes > 500) throw new Error("Limite de lotes excedido.");
+      const response = await fetch("/api/exames/lote" + (cursor ? "?cursor=" + encodeURIComponent(cursor) : ""), {
+        method: "GET", headers: {Authorization:"Bearer "+token},
+        credentials: "same-origin", cache: "no-store"
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Falha ao carregar lote.");
+      if (!Array.isArray(payload.exames) || typeof payload.concluido !== "boolean") throw new Error("Resposta de lote inválida.");
+      totalAbas = payload.totalAbas || totalAbas;
+      abasProcessadas = payload.abasProcessadas ?? abasProcessadas;
+      for (const original of payload.exames) {
+        if (!original.id || idsRecebidos.has(original.id)) continue;
+        idsRecebidos.add(original.id);
+        const item = {...original};
+        const id = String(item.id || "");
+        const local = entregasLocaisPendentes.get(id);
+        if (local) {
+          if (item.dataRetirada === local.dataRetirada && item.colaborador === local.colaborador && item.quemRetirou === local.quemRetirou) entregasLocaisPendentes.delete(id);
+          else if (!item.dataRetirada && !item.colaborador && !item.quemRetirou) Object.assign(item, local);
+          else entregasLocaisPendentes.delete(id);
+        }
+        const nomeAba = item.abaOrigem || item.aba || "Exames Geral";
+        if (!agrupados[nomeAba]) agrupados[nomeAba] = {aba:nomeAba,dados:[]};
+        let data = String(item.dataRetirada || "");
+        if (data.length > 15) {
+          const parsed = new Date(data);
+          if (!Number.isNaN(parsed.getTime())) data = parsed.toLocaleDateString("pt-BR");
+        }
+        agrupados[nomeAba].dados.push([item.paciente || "",item.exame || "","","",data,"",item.colaborador || "","",item.quemRetirou || "",id]);
       }
-      const nomeAba = item.abaOrigem || item.aba || "Exames Geral";
-      if (!agrupados[nomeAba]) agrupados[nomeAba] = {aba:nomeAba,dados:[]};
-      let data = String(item.dataRetirada || "");
-      if (data.length > 15) {
-        const parsed = new Date(data);
-        if (!Number.isNaN(parsed.getTime())) data = parsed.toLocaleDateString("pt-BR");
-      }
-      agrupados[nomeAba].dados.push([
-        item.paciente || "",item.exame || "","","",data,"",
-        item.colaborador || "","",item.quemRetirou || "",id
-      ]);
+      if (generation !== examesSyncGeneration || auth.currentUser?.uid !== user.uid) return;
+      sheetsData = Object.values(agrupados);
+      populateAbasSelect();
+      renderTable();
+      concluido = payload.concluido;
+      if (!concluido && (!payload.cursor || payload.cursor === cursor)) throw new Error("Cursor de sincronização inválido.");
+      cursor = payload.cursor || "";
+      updateSyncStatus(concluido ? "success" : "syncing",
+        concluido ? "Sincronização concluída" : "Carregando abas " + abasProcessadas + "/" + totalAbas + " (dados parciais)");
     }
-    sheetsData = Object.values(agrupados);
-    populateAbasSelect();
-    renderTable();
-    updateSyncStatus("success",sheetsData.length?"Conectado (planilha/KV)":"Conectado (sem exames)");
   } catch(error) {
     if (generation === examesSyncGeneration) {
       console.error("Erro ao consultar exames:",error);
