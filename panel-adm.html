@@ -44,6 +44,11 @@
         </form>
         <div class="overflow-x-auto mt-6"><table class="min-w-full text-sm"><thead class="bg-slate-50 dark:bg-slate-800 text-left"><tr><th class="p-3">Nome</th><th class="p-3">Usuário</th><th class="p-3">Perfil</th><th class="p-3">Status</th><th class="p-3">Ação</th></tr></thead><tbody id="users-table-body"><tr><td colspan="5" class="p-4 text-center text-slate-500">Carregando usuários...</td></tr></tbody></table></div>
       </section>
+      <section class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm space-y-4" aria-labelledby="avisos-history-title">
+        <div class="flex flex-wrap items-center justify-between gap-3"><div><h2 id="avisos-history-title" class="text-xl font-bold">Central de Avisos</h2><p class="text-sm text-slate-500">Histórico dos comunicados enviados aos colaboradores</p></div><button id="refresh-announcements" type="button" class="rounded-xl px-4 py-2 bg-cyan-600 text-white font-semibold">Atualizar avisos</button></div>
+        <p id="announcements-status" class="text-sm text-slate-500" role="status">Aguardando carregamento...</p>
+        <div id="announcements-history" class="space-y-3"></div>
+      </section>
       <p id="data-status" class="text-xs text-slate-500 text-center" role="status"></p>
     </main>
   </div>
@@ -51,6 +56,9 @@
     <form id="announcement-form" class="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl space-y-4">
       <h2 id="announcement-editor-title" class="text-xl font-bold">Emitir mensagem aos usuários</h2>
       <p class="text-sm text-slate-500 dark:text-slate-400">O aviso será exibido para os usuários conectados e para quem entrar depois.</p>
+      <label for="announcement-title" class="block text-sm font-semibold">Título</label><input id="announcement-title" maxlength="120" required class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3" placeholder="Título do comunicado">
+      <label for="announcement-category" class="block text-sm font-semibold">Tipo do aviso</label><select id="announcement-category" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3"><option value="informativo">Informativo (sininho)</option><option value="importante">Importante (sininho)</option><option value="urgente">Urgente (modal)</option></select>
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="announcement-required"> Exigir confirmação em modal</label>
       <label for="announcement-text" class="block text-sm font-semibold">Mensagem</label>
       <textarea id="announcement-text" required maxlength="1000" rows="5" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-3" placeholder="Digite o comunicado..."></textarea>
       <p id="announcement-feedback" class="text-sm" role="status"></p>
@@ -234,14 +242,18 @@
       enviar.disabled = true;
       $('announcement-feedback').textContent = 'Enviando aviso...';
       try {
-        await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'avisos', 'atual'), {
+        await setDoc(doc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'avisos')), {
+          titulo: clean($('announcement-title').value).slice(0,120),
           mensagem,
-          id: crypto.randomUUID(),
+          categoria: $('announcement-category').value,
+          leituraObrigatoria: $('announcement-required').checked,
+          ativo: true,
           criadoEm: serverTimestamp(),
           criadoPor: auth.currentUser.uid
         });
-        $('announcement-text').value = '';
+        $('announcement-text').value = ''; $('announcement-title').value = ''; $('announcement-required').checked = false;
         fecharEditor();
+        await carregarHistoricoAvisos();
       } catch (erro) {
         console.error('Erro ao enviar aviso:', erro);
         $('announcement-feedback').textContent = 'Não foi possível enviar. Confira as permissões da coleção avisos no Firestore.';
@@ -249,6 +261,33 @@
         enviar.disabled = false;
       }
     });
+    async function carregarHistoricoAvisos() {
+      if (!administradorUid) return;
+      const area = $('announcements-history'), status = $('announcements-status');
+      status.textContent = 'Carregando comunicados...';
+      try {
+        const { getDocs } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+        const snapshot = await getDocs(collection(db, 'artifacts', APP_ID, 'public', 'data', 'avisos'));
+        const avisos = snapshot.docs.map(d => ({id:d.id, ...d.data()}))
+          .sort((a,b) => (b.criadoEm?.toMillis?.() || 0) - (a.criadoEm?.toMillis?.() || 0));
+        area.replaceChildren();
+        for (const aviso of avisos) {
+          const item = document.createElement('article');
+          item.className = 'rounded-xl border border-slate-200 dark:border-slate-700 p-4';
+          const titulo = document.createElement('h3'); titulo.className = 'font-bold'; titulo.textContent = aviso.titulo || 'Comunicado anterior';
+          const mensagem = document.createElement('p'); mensagem.className = 'text-sm whitespace-pre-wrap mt-2'; mensagem.textContent = aviso.mensagem || '';
+          const info = document.createElement('p'); info.className = 'text-xs text-slate-500 mt-2';
+          const data = aviso.criadoEm?.toDate?.();
+          info.textContent = [aviso.categoria || 'legado', aviso.leituraObrigatoria ? 'Leitura obrigatória' : '', data ? data.toLocaleString('pt-BR') : ''].filter(Boolean).join(' • ');
+          item.append(titulo, mensagem, info); area.appendChild(item);
+        }
+        status.textContent = avisos.length ? avisos.length + ' comunicado(s) encontrado(s).' : 'Nenhum comunicado publicado.';
+      } catch (error) {
+        console.error('Erro ao carregar avisos:', error);
+        status.textContent = 'Falha ao carregar histórico de avisos. Verifique as permissões do Firestore.';
+      }
+    }
+    $('refresh-announcements').addEventListener('click', carregarHistoricoAvisos);
     // A criação de contas é executada no Worker, nunca diretamente no navegador.
     async function chamarUsuarios(method, path, body) {
       const token = await auth.currentUser?.getIdToken();
@@ -356,7 +395,7 @@
         $('panel').classList.remove('hidden');
         administradorUid = user.uid;
         iniciarLeitura();
-        await carregarUsuarios();
+        await Promise.all([carregarUsuarios(), carregarHistoricoAvisos()]);
       } catch(error) {
         console.error('Falha na validação administrativa:', error);
         mostrarErro(error.message || 'Não foi possível validar sua permissão.');
