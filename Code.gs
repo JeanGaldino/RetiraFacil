@@ -87,7 +87,7 @@ function rfListarLote(data) {
   const cursor = String(data.cursor || "");
   let indice = 0, linha = 2;
   if (cursor) {
-    const partes = /^(\\d+):(\\d+):(\\d+)$/.exec(cursor);
+    const partes = /^([0-9]+):([0-9]+):([0-9]+)$/.exec(cursor);
     if (!partes) return {sucesso:false,codigo:"CURSOR_INVALIDO"};
     indice = Number(partes[1]);
     linha = Number(partes[2]);
