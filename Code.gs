@@ -16,6 +16,7 @@ function doPost(e) {
     if (!secret || !rfIgualSeguro(String(data.secret || ""),secret))
       return rfResposta({sucesso:false,codigo:"NAO_AUTORIZADO"});
     if(data.acao==="listar") return rfResposta({sucesso:true,exames:rfListar()});
+    if(data.acao==="listar_lote") return rfResposta(rfListarLote(data));
     if(data.acao==="entregar") return rfResposta(rfEntregar(data));
     return rfResposta({sucesso:false,codigo:"ACAO_INVALIDA"});
   } catch(err) {
@@ -74,6 +75,58 @@ function rfListar() {
   if(!resultado.sucesso)throw new Error("Planilha ocupada.");
   return resultado.exames;
 }
+/**
+ * Sincronização progressiva: no máximo uma aba e 400 registros por chamada.
+ * Cursor opaco codifica índice da aba e próxima linha. A API intermediária
+ * deve repassar cursor e a resposta completa, sem reconsultar rfListar().
+ * A listagem completa existente permanece disponível durante a migração.
+ */
+function rfListarLote(data) {
+  const tamanho = 400;
+  const abas = rfPlanilha().getSheets();
+  const cursor = String(data.cursor || "");
+  let indice = 0, linha = 2;
+  if (cursor) {
+    const partes = /^([0-9]+):([0-9]+):([0-9]+)$/.exec(cursor);
+    if (!partes) return {sucesso:false,codigo:"CURSOR_INVALIDO"};
+    indice = Number(partes[1]);
+    linha = Number(partes[2]);
+    const idEsperado = Number(partes[3]);
+    if (!Number.isSafeInteger(indice) || indice < 0 || indice >= abas.length ||
+        !Number.isSafeInteger(linha) || linha < 2 ||
+        abas[indice].getSheetId() !== idEsperado)
+      return {sucesso:false,codigo:"CURSOR_INVALIDO"};
+  }
+  // Uma aba por chamada evita percorrer todas as abas antes de responder.
+  if (indice >= abas.length) return {sucesso:true,exames:[],concluido:true,cursor:null};
+  const aba = abas[indice];
+  const ultimaLinha = aba.getLastRow();
+  const ultimaLida = Math.min(ultimaLinha, linha + tamanho - 1);
+  const exames = [];
+  if (ultimaLida >= linha) {
+    const rows = aba.getRange(linha,1,ultimaLida-linha+1,9).getValues();
+    for (let i=0;i<rows.length;i++) {
+      const r=rows[i], paciente=rfTexto(r[0]);
+      if (!paciente || rfNome(paciente)==="nome do paciente") continue;
+      exames.push({
+        id:aba.getSheetId()+"_"+(linha+i),
+        paciente,exame:rfTexto(r[1]),
+        dataRetirada:rfTexto(r[4]),colaborador:rfTexto(r[6]),
+        quemRetirou:rfTexto(r[8]),abaOrigem:aba.getName()
+      });
+    }
+  }
+  const continuaNaAba = ultimaLida < ultimaLinha;
+  const proximoIndice = continuaNaAba ? indice : indice + 1;
+  const proximaLinha = continuaNaAba ? ultimaLida + 1 : 2;
+  const concluido = proximoIndice >= abas.length;
+  return {
+    sucesso:true,exames,concluido,
+    cursor:concluido ? null : proximoIndice+":"+proximaLinha+":"+abas[proximoIndice].getSheetId(),
+    abaAtual:aba.getName(),abasProcessadas:continuaNaAba?indice:indice+1,totalAbas:abas.length
+  };
+}
+
 function rfEntregar(data) {
   const paciente=rfTexto(data.paciente),abaNome=rfTexto(data.aba);
   const colaborador=rfTexto(data.colaborador),retiradoPor=rfTexto(data.retiradoPor);
