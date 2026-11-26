@@ -96,7 +96,13 @@
       $('loading-message').classList.add('text-rose-600');
       console.error('[RetiraFácil Admin]', mensagem);
     }
-    function voltarLogin() { window.location.replace('index.html'); }
+    function voltarLogin() {
+      if (window.parent !== window) window.parent.postMessage({type:'retirafacil-admin-close'}, window.location.origin);
+      else window.location.replace('index.html');
+    }
+    document.querySelector('a[href="index.html"]')?.addEventListener('click', event => {
+      if (window.parent !== window) { event.preventDefault(); voltarLogin(); }
+    });
     function foiEntregue(exame) {
       // A retirada é reconhecida por uma data preenchida ou por um indicador explícito.
       const data = clean(exame.dataRetirada);
@@ -391,6 +397,9 @@
         const perfil = perfilDoc.data();
         if (perfil.ativo !== true) throw new Error('Seu usuário está inativo.');
         if (clean(perfil.tipo).toLowerCase() !== 'admin') throw new Error('Acesso permitido apenas para administradores.');
+        const token = await user.getIdToken();
+        const acesso = await fetch('/api/admin/session', {headers:{Authorization:'Bearer '+token}, credentials:'same-origin', cache:'no-store'});
+        if (!acesso.ok) throw new Error('Confirme novamente a senha administrativa.');
         $('loading').classList.add('hidden');
         $('panel').classList.remove('hidden');
         administradorUid = user.uid;
