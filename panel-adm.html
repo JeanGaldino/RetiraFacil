@@ -27,7 +27,6 @@
         <article class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm"><p class="text-sm text-slate-500">Aguardando entrega</p><p id="stat-pending" class="text-3xl font-bold mt-2 text-amber-600">0</p></article>
         <article class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm"><p class="text-sm text-slate-500">Taxa de entrega</p><p id="stat-rate" class="text-3xl font-bold mt-2 text-cyan-600">0%</p></article>
       </section>
-      <section class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm flex flex-wrap items-center justify-between gap-4"><div><h2 class="font-bold text-lg">Sincronização programada</h2><p class="text-sm text-slate-500">Próximo horário previsto: 18h (horário de Brasília)</p></div><div id="sync-timer" class="text-2xl font-mono font-bold text-cyan-600">--:--:--</div></section>
       <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl shadow-sm overflow-hidden"><div class="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3"><h2 class="font-bold text-lg">Auditoria de retiradas <span class="block text-xs font-normal text-slate-500">Somente hoje • horário de Brasília</span></h2><input id="audit-search" type="search" placeholder="Buscar paciente ou colaborador" class="w-full sm:w-72 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm"></div><div class="overflow-x-auto"><table class="min-w-full text-sm"><thead class="bg-slate-50 dark:bg-slate-800 text-left"><tr><th class="p-4">Paciente</th><th class="p-4">Exame</th><th class="p-4">Colaborador</th><th class="p-4">Retirado por</th><th class="p-4">Data da retirada</th></tr></thead><tbody id="audit-table-body"><tr><td colspan="5" class="p-5 text-center text-slate-500">Carregando...</td></tr></tbody></table></div></div>
         <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm"><h2 class="p-6 border-b border-slate-200 dark:border-slate-800 font-bold text-lg">Ranking de colaboradores <span class="block text-xs font-normal text-slate-500">Entregas realizadas hoje</span></h2><div id="collab-ranking-list" class="p-6 space-y-3"><p class="text-slate-500">Carregando...</p></div></div>
@@ -211,21 +210,6 @@
         if (!document.hidden) atualizarExamesAdmin();
       }, 300000);
     }
-    function iniciarTimer() {
-      const atualizar = () => {
-        const partes = new Intl.DateTimeFormat('en-GB', {timeZone:'America/Sao_Paulo', hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23'}).formatToParts(new Date());
-        const p = Object.fromEntries(partes.map(x => [x.type, Number(x.value)]));
-        const atual = p.hour*3600 + p.minute*60 + p.second;
-        const alvo = 18*3600;
-        let restante = alvo - atual;
-        if (restante <= 0) restante += 86400;
-        const h = String(Math.floor(restante/3600)).padStart(2,'0');
-        const m = String(Math.floor((restante%3600)/60)).padStart(2,'0');
-        const s = String(restante%60).padStart(2,'0');
-        $('sync-timer').textContent = `${h}:${m}:${s}`;
-      };
-      atualizar(); setInterval(atualizar, 1000);
-    }
     $('audit-search').addEventListener('input', renderAuditTable);
     $('theme-button').addEventListener('click', () => {
       document.documentElement.classList.toggle('dark');
@@ -378,7 +362,6 @@
       }
     });
 
-    iniciarTimer();
     // Atualiza também na virada do dia, mesmo sem novos eventos do Firestore.
     let ultimoDiaExibido = diaBrasilia();
     setInterval(() => {
