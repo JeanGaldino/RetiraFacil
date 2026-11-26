@@ -36,6 +36,9 @@ export default {
         return await logout(request, env);
       }
 
+      if (url.pathname === "/api/exames/lote" && request.method === "GET") {
+        return await obterExamesCompartilhados(request, env, true);
+      }
       if (url.pathname === "/api/exames" && request.method === "GET") {
         return await obterExamesCompartilhados(request, env);
       }
@@ -595,11 +598,18 @@ async function chamarPlanilha(env, dados) {
   }
   return result;
 }
-async function obterExamesCompartilhados(request,env) {
-  if (!env.EXAMS_CACHE) return json({error:"Configure o binding EXAMS_CACHE."},503);
+async function obterExamesCompartilhados(request,env,lote=false) {
+  if (!lote && !env.EXAMS_CACHE) return json({error:"Configure o binding EXAMS_CACHE."},503);
   try {
     const access = await autorizarExames(request,env);
     if (access.error) return access.error;
+    if (lote) {
+      const cursor = new URL(request.url).searchParams.get("cursor") || "";
+      if (cursor && !/^\d{1,15}:\d{1,15}:\d{1,15}$/.test(cursor)) return json({error:"Cursor inválido."},400);
+      const result = await chamarPlanilha(env,{acao:"listar_lote",cursor});
+      if (!Array.isArray(result.exames) || typeof result.concluido !== "boolean") return json({error:"Resposta de lote inválida. Atualize a implantação do Apps Script."},503);
+      return json(result);
+    }
     const cached = await env.EXAMS_CACHE.get(EXAMS_CACHE_KEY,"json").catch(error => {
       console.error("Falha ao consultar cache de exames:",error);
       return null;
