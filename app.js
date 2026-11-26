@@ -406,6 +406,7 @@ async function realizarLogout() {
 // ======================================================
 
 function encerrarSessaoVisual() {
+  fecharPainelAdmin();
   ocultarSplashLogin();
   fecharModalSenhaAdmin();
   pararSincronizacaoExames();
@@ -1094,6 +1095,48 @@ async function confirmarEntregaAction() {
 // ACESSO ADMINISTRATIVO
 // ======================================================
 
+let painelAdminModal = null;
+function fecharPainelAdmin() {
+  if (!painelAdminModal) return;
+  const modal = painelAdminModal;
+  painelAdminModal = null;
+  modal.close();
+  modal.remove();
+}
+function abrirPainelAdmin() {
+  if (painelAdminModal || !currentUser || currentUserProfile?.tipo !== "admin") return;
+  const modal = document.createElement("dialog");
+  modal.setAttribute("aria-label", "Painel administrativo");
+  modal.className = "fixed inset-0 m-auto w-[95vw] h-[95dvh] max-w-none max-h-none p-0 rounded-2xl shadow-2xl overflow-hidden bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 backdrop:bg-slate-950/70 backdrop:backdrop-blur-sm";
+  const barra = document.createElement("div");
+  barra.className = "flex items-center justify-between px-4 py-2 border-b dark:border-slate-700";
+  const titulo = document.createElement("strong");
+  titulo.textContent = "Painel administrativo";
+  const fechar = document.createElement("button");
+  fechar.type = "button";
+  fechar.className = "px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800";
+  fechar.textContent = "✕ Fechar";
+  fechar.addEventListener("click", fecharPainelAdmin);
+  barra.append(titulo, fechar);
+  const frame = document.createElement("iframe");
+  frame.title = "Administração RetiraFácil";
+  frame.src = "panel-adm.html?modal=1";
+  frame.className = "w-full flex-1 min-h-0 border-0";
+  const layout = document.createElement("div");
+  layout.className = "flex flex-col h-full";
+  layout.append(barra, frame);
+  modal.append(layout);
+  modal.addEventListener("cancel", event => { event.preventDefault(); fecharPainelAdmin(); });
+  document.body.append(modal);
+  painelAdminModal = modal;
+  modal.showModal();
+}
+window.addEventListener("message", event => {
+  if (event.origin !== window.location.origin || !painelAdminModal) return;
+  if (event.source !== painelAdminModal.querySelector("iframe")?.contentWindow) return;
+  if (event.data?.type === "retirafacil-admin-close") fecharPainelAdmin();
+});
+
 function fecharModalSenhaAdmin() {
   const modal = document.getElementById("modal-admin-password");
   const senha = document.getElementById("admin-password-input");
@@ -1132,7 +1175,7 @@ document.getElementById("admin-password-form")?.addEventListener("submit", async
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || "Acesso negado.");
     fecharModalSenhaAdmin();
-    window.location.href = "panel-adm.html";
+    abrirPainelAdmin();
   } catch (error) {
     if (erro) {
       erro.textContent = error.message || "Acesso negado";
